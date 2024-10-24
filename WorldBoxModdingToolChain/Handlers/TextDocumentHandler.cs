@@ -17,8 +17,13 @@ namespace WorldBoxModdingToolChain.Handlers
 {
     public class TextDocumentHandler : TextDocumentSyncHandlerBase
     {
-        
-        
+        private readonly IDictionary<Uri, string[]> _documentContents;
+
+        public TextDocumentHandler(IDictionary<Uri, string[]> documentContents)
+        {
+            _documentContents = documentContents;
+        }
+
         private readonly TextDocumentSelector _textDocumentSelector = new TextDocumentSelector(
             new TextDocumentFilter
             {
@@ -36,6 +41,7 @@ namespace WorldBoxModdingToolChain.Handlers
         public override async Task<MediatR.Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
         {
             FileLogger.Log($"Document opened: {request.TextDocument.Uri}");
+            _documentContents[(Uri)request.TextDocument.Uri] = request.TextDocument.Text.Split('\n');
             await Task.Yield();
             return MediatR.Unit.Value;
         }
@@ -43,6 +49,13 @@ namespace WorldBoxModdingToolChain.Handlers
         public override Task<MediatR.Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
         {
             FileLogger.Log($"Document changed: {request.TextDocument.Uri}");
+
+            foreach (var change in request.ContentChanges)
+            {
+                // In a simple case, replace the whole document content
+                _documentContents[(Uri)request.TextDocument.Uri] = change.Text.Split('\n');
+            }
+
             return MediatR.Unit.Task;
         }
 
