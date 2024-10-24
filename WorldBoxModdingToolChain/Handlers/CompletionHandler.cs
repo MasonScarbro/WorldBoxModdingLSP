@@ -5,13 +5,22 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
+using WorldBoxModdingToolChain.Analysis;
 
 namespace WorldBoxModdingToolChain.Handlers
 {
+   
     public class CompletionHandler : ICompletionHandler
     {
+        private readonly GameCodeMetaDataRender _metaDataRender;
+        public CompletionHandler(GameCodeMetaDataRender metaDataRender)
+        {
+            _metaDataRender = metaDataRender;
+        }
+
         public CompletionRegistrationOptions GetRegistrationOptions(CompletionCapability capability, ClientCapabilities clientCapabilities)
         {
             return new CompletionRegistrationOptions();
