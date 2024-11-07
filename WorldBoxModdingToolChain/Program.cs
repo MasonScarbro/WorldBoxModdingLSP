@@ -34,6 +34,7 @@ namespace WorldBoxModdingToolChain
                         {
                             services.AddSingleton(new GameCodeMetaDataRender("C:\\Program Files (x86)\\Steam\\steamapps\\common\\worldbox\\worldbox_Data\\Managed\\Assembly-CSharp.dll"));
                             services.AddSingleton<IDictionary<Uri, string[]>>(new Dictionary<Uri, string[]>());
+                            services.AddSingleton(new AnalysisStorage());
                         })
                         .OnInitialize((server, request, token) =>
                         {

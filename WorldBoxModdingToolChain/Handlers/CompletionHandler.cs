@@ -1,4 +1,6 @@
-﻿using OmniSharp.Extensions.LanguageServer.Protocol;
+﻿using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -20,28 +22,108 @@ namespace WorldBoxModdingToolChain.Handlers
     {
         private readonly GameCodeMetaDataRender _metaDataRender;
         private readonly IDictionary<Uri, string[]> _documentContents;
-        public CompletionHandler(GameCodeMetaDataRender metaDataRender, IDictionary<Uri, string[]> documentContents)
+        private readonly AnalysisStorage _analysisStorage;
+        public CompletionHandler(GameCodeMetaDataRender metaDataRender, IDictionary<Uri, string[]> documentContents, AnalysisStorage analysisStorage)
         {
             _metaDataRender = metaDataRender;
             _documentContents = documentContents;
+            _analysisStorage = analysisStorage;
         }
 
         public CompletionRegistrationOptions GetRegistrationOptions(CompletionCapability capability, ClientCapabilities clientCapabilities)
         {
             return new CompletionRegistrationOptions
             {
-                TriggerCharacters = new[] { ".", " ", "[" }
+                TriggerCharacters = new[] { ".", " ", "[", "new" }
             };
         }
 
         public Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
         {
+            var line = GetCurrentLine(request);
+            var syntaxTree = CSharpSyntaxTree.ParseText(line);
+            var root = syntaxTree.GetRoot();
 
-            var wordsForeDot = GetWordsBeforeDots(request);
-            var completionItems = GetClassCompletionItems(GetCurrentTrimmedWord(GetCurrentLine(request)));
-            completionItems.AddRange(GetCompletionItemsFromGameCode(wordsForeDot));
-           
+            var position = request.Position.Character;
+            var tokenAtCursor = root.FindToken(position);
+
+            var completionItems = new List<CompletionItem>();
+            List<string> memberNames = new List<string>();
+            var fields_and_properties = _metaDataRender.GetFieldsAndProperties();
+
+            if (tokenAtCursor.Parent is MemberAccessExpressionSyntax memberAccess)
+            {
+                while (memberAccess != null)
+                {
+                    // Add the right side of the member access (e.g., "foo" or "bar")
+                    memberNames.Insert(0, memberAccess.Name.Identifier.Text);
+
+                    // Move to the left side of the member access (could be another MemberAccessExpression or Identifier)
+                    if (memberAccess.Expression is MemberAccessExpressionSyntax nestedAccess)
+                    {
+                        FileLogger.Log("Is Nested Access");
+                        memberAccess = nestedAccess;
+                    }
+                    else if (memberAccess.Expression is IdentifierNameSyntax identifier)
+                    {
+                        // Reached the root of the chain (e.g., "b")
+                        FileLogger.Log("Found Root: " + identifier.Identifier.Text);
+                        memberNames.Insert(0, identifier.Identifier.Text);
+                        break;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                memberNames = memberNames.Where(name => !string.IsNullOrWhiteSpace(name)).ToList();
+
+                FileLogger.Log("Filtered MemberNames Before TraceLookup: " + string.Join(", ", memberNames));
+                var correctedMemberNames = TraceLookupClassGeneration
+                        (
+                            memberNames,
+                            fields_and_properties
+                        );
+                FileLogger.Log("Corrected MemberNames: " + string.Join(", ", correctedMemberNames));
+                var targetClass = correctedMemberNames[0].Trim();
+                if (fields_and_properties.ContainsKey(targetClass))
+                {
+                    FileLogger.Log($"Class '{targetClass}' found, fetching members...");
+                    var members = fields_and_properties[targetClass];
+
+                    foreach (GameClassMetaObject metadata in members)
+                    {
+                        completionItems.Add
+                            (
+                                new CompletionItem
+                                {
+                                    Label = metadata.Name,
+                                    Kind = metadata.Kind,
+                                    Documentation = $"Type: {metadata.TypeName()}",
+                                    InsertText = GetProperInsertText(metadata.Name, metadata.Kind)
+
+                                }
+                            );
+                    }
+                }
+                else
+                {
+                    FileLogger.Log($"Word Before Dot '{targetClass}' was NOT in the list of classes.");
+                }
+            }
             
+            FileLogger.Log("Dummy Handle Result: " + string.Join(", ", memberNames));
+
+            completionItems.AddRange(
+                GetClassCompletionItems(
+                    GetCurrentTrimmedWord(
+                        GetCurrentLine(request)
+                        )
+                    )
+                );
+            //completionItems.AddRange(GetCompletionItemsFromGameCode(memberNames));
+            FileLogger.Log("Returning completion items: " + completionItems.Count);
+
             return Task.FromResult(new CompletionList(completionItems));
 
 
@@ -71,68 +153,22 @@ namespace WorldBoxModdingToolChain.Handlers
             return classCompletionItems;
         }
 
-        public List<CompletionItem> GetCompletionItemsFromGameCode(List<string> wordsBeforeDot)
-        {
-            var fields_and_properties = _metaDataRender.GetFieldsAndProperties();
-            var completionItems = new List<CompletionItem>();
-            FileLogger.Log("Count: " + wordsBeforeDot.Count);
-            if (wordsBeforeDot.Count == 1)
-            {
-
-                var targetClass = wordsBeforeDot[0].Trim();
-                FileLogger.Log("Word Before Dot: " + targetClass);
-
-                if (fields_and_properties.ContainsKey(targetClass))
-                {
-                    FileLogger.Log($"Class '{targetClass}' found, fetching members...");
-                    var members = fields_and_properties[wordsBeforeDot[0]];
-
-                    foreach (GameClassMetaObject metadata in members)
-                    {
-                        completionItems.Add
-                            (
-                                new CompletionItem
-                                {
-                                    Label = metadata.Name,
-                                    Kind = metadata.Kind,
-                                    Documentation = $"Type: {metadata.TypeName()}",
-                                    InsertText = GetProperInsertText(metadata.Name, metadata.Kind)
-
-                                }
-                            );
-                    }
-                }
-                else
-                {
-                    FileLogger.Log($"Word Before Dot '{targetClass}' was NOT in the list of classes.");
-                }     
-            }
-            else
-            {
-
-                var nestedCompletionItems = 
-                    GetCompletionItemsFromGameCode
-                    (
-                        TraceLookupClassGeneration
-                        (
-                            wordsBeforeDot,
-                            fields_and_properties
-                        )
-                    );
-                completionItems.AddRange(nestedCompletionItems);
-            }
-            
-            
-            
-            return completionItems;
-        }
-
 
         private List<string> TraceLookupClassGeneration(List<string> wordsBeforeDot, Dictionary<string, List<GameClassMetaObject>> fields_and_properties)
         {
             FileLogger.Log("Starting TraceLookup with words: " + string.Join(", ", wordsBeforeDot));
             while (wordsBeforeDot.Count > 1)
             {
+                FileLogger.Log($"We are inside the while with count: {wordsBeforeDot.Count}");
+                if (_analysisStorage.GetCurrentDocumentVariables().TryGetValue(wordsBeforeDot[0], out string variableType))
+                {
+                    FileLogger.Log($"Changed {wordsBeforeDot[0]} to {variableType}");
+                    //if the type is found simply change the word to the type so we can
+                    //check the class
+                    wordsBeforeDot[0] = variableType;
+                    
+                }
+
                 if (fields_and_properties.ContainsKey(wordsBeforeDot[0]))
                 {
 
@@ -170,7 +206,7 @@ namespace WorldBoxModdingToolChain.Handlers
             var uri = request.TextDocument.Uri;
             FileLogger.Log("URI: " + uri);
 
-            var pos = request.Position;
+            var pos = request.Position; 
             FileLogger.Log("Pos: " + pos);
             if (_documentContents.TryGetValue((Uri)uri, out var lines))
             {
@@ -186,116 +222,25 @@ namespace WorldBoxModdingToolChain.Handlers
             return String.Empty;
         }
 
+        
+
         private string GetCurrentTrimmedWord(string line)
         {
-            if (line.Contains("["))
+            string pattern = @"new\s+(.*)";
+            Match match = Regex.Match(line, pattern);
+            match = Regex.Match(line, pattern);
+            if (match.Success)
             {
-                string pattern = @"\[(.*)";
-                Match match = Regex.Match(line, pattern);
-                if (match.Success)
-                {
-                    if (line.Contains(']'))
-                    {
-                        line = match.Groups[1].Value.Trim(']');
-                    }
-                    else
-                    {
-                        line = match.Groups[1].Value;
-                    }
-                    
-                }
+                    line = match.Groups[1].Value.Trim();
             }
-            //TODO: This fucks up getting return types for functions FIX!
-            else if (line.Contains("("))
-            {
-                string pattern = @"\((.*)";
-                Match match = Regex.Match(line, pattern);
-                if (match.Success)
-                {
-                    if (line.Contains(')'))
-                    {
-                        line = match.Groups[1].Value.Trim(')');
-                    }
-                    else
-                    {
-                        line = match.Groups[1].Value;
-                    }
+            
 
-                }
-            }
-            else if (line.Contains("{"))
-            {
-                string pattern = @"\{(.*)";
-                Match match = Regex.Match(line, pattern);
-                if (match.Success)
-                {
-                    if (line.Contains('}'))
-                    {
-                        line = match.Groups[1].Value.Trim(')');
-                    }
-                    else
-                    {
-                        line = match.Groups[1].Value;
-                    }
 
-                }
-            }
             FileLogger.Log($"Trimmed up current word: {line}"); 
-            return line;
+            return line.Trim();
             
         }
 
-
-
-
-
-        private List<string> GetWordsBeforeDots(CompletionParams request)
-        {
-            var line = GetCurrentLine(request);
-            FileLogger.Log("Line: " + line);
-            // Get the character index before the position
-            var characterIndex = request.Position.Character;
-
-            var words = new List<string>();
-
-            if (characterIndex <=0) return words;
-
-            var textUpToCurser = line.Substring(0, characterIndex);
-            FileLogger.Log($"Text up to cursor: {textUpToCurser}");
-            var segments = textUpToCurser.Split('.');
-            for (int i = 0; i < segments.Length; i++)
-            {
-                var segment = segments[i].Trim();
-
-                if (!string.IsNullOrEmpty(segment))
-                {
-                    var trimmedWord = GetCurrentTrimmedWord(segment);
-                    //FileLogger.Log("(GetWords) Word: " + line);
-                    words.Add(trimmedWord);
-                }
-                    
-            }
-            FileLogger.Log($"Found words before dots: {string.Join(", ", words)}");
-            return words;
-        }
-
-
-        private string ExtractWordBeforeDot(string line, int characterIndex)
-        {
-            // Look backwards in the line to find the start of the word
-            var startIndex = characterIndex - 1;
-            
-            
-
-            while (startIndex > 0 && !char.IsWhiteSpace(line[startIndex - 1]) && line[startIndex - 1] != '.')
-            {
-                startIndex--;
-                FileLogger.Log($"StartIndex: {startIndex} Line: {line}");
-            }
-            
-            // Return the word found before the dot
-            return line.Substring(startIndex + (char.IsWhiteSpace(line[startIndex]) ? 1 : 0), characterIndex - startIndex - 1).Trim();
-        }
 
         private bool IsDelimiter(char c)
         {
@@ -306,5 +251,72 @@ namespace WorldBoxModdingToolChain.Handlers
             return name + (kind == CompletionItemKind.Method ? "()" : "");
         }
 
+        #region Potential
+        //public List<CompletionItem> GetCompletionItemsFromGameCode(List<string> wordsBeforeDot)
+        //{
+        //    var fields_and_properties = _metaDataRender.GetFieldsAndProperties();
+        //    var completionItems = new List<CompletionItem>();
+        //    FileLogger.Log("Count: " + wordsBeforeDot.Count);
+        //    if (wordsBeforeDot.Count == 1)
+        //    {
+
+        //        var targetClass = wordsBeforeDot[0].Trim();
+
+        //        if (_analysisStorage.GetCurrentDocumentVariables().TryGetValue(wordsBeforeDot[0], out string variableType))
+        //        {
+        //            FileLogger.Log($"Changed {targetClass} to {variableType}");
+        //            //if the type is found simply change the word to the type so we can
+        //            //check the class
+        //            targetClass = variableType;
+
+        //        }
+
+        //        FileLogger.Log("Word Before Dot: " + targetClass);
+
+        //        if (fields_and_properties.ContainsKey(targetClass))
+        //        {
+        //            FileLogger.Log($"Class '{targetClass}' found, fetching members...");
+        //            var members = fields_and_properties[targetClass];
+
+        //            foreach (GameClassMetaObject metadata in members)
+        //            {
+        //                completionItems.Add
+        //                    (
+        //                        new CompletionItem
+        //                        {
+        //                            Label = metadata.Name,
+        //                            Kind = metadata.Kind,
+        //                            Documentation = $"Type: {metadata.TypeName()}",
+        //                            InsertText = GetProperInsertText(metadata.Name, metadata.Kind)
+
+        //                        }
+        //                    );
+        //            }
+        //        }
+        //        else
+        //        {
+        //            FileLogger.Log($"Word Before Dot '{targetClass}' was NOT in the list of classes.");
+        //        }     
+        //    }
+        //    else  if ( wordsBeforeDot.Count > 1 )
+        //    {
+
+        //        var nestedCompletionItems = 
+        //            GetCompletionItemsFromGameCode
+        //            (
+        //                TraceLookupClassGeneration
+        //                (
+        //                    wordsBeforeDot,
+        //                    fields_and_properties
+        //                )
+        //            );
+        //        completionItems.AddRange(nestedCompletionItems);
+        //    }
+
+
+
+        //    return completionItems;
+        //}
+        #endregion
     }
 }

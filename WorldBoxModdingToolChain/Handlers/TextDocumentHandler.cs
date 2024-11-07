@@ -11,6 +11,7 @@ using System.Linq;
 using System.Reactive;
 using System.Text;
 using System.Threading.Tasks;
+using WorldBoxModdingToolChain.Analysis;
 using WorldBoxModdingToolChain.Utils;
 
 namespace WorldBoxModdingToolChain.Handlers
@@ -18,10 +19,12 @@ namespace WorldBoxModdingToolChain.Handlers
     public class TextDocumentHandler : TextDocumentSyncHandlerBase
     {
         private readonly IDictionary<Uri, string[]> _documentContents;
+        private readonly AnalysisStorage _analysisStorage;
 
-        public TextDocumentHandler(IDictionary<Uri, string[]> documentContents)
+        public TextDocumentHandler(IDictionary<Uri, string[]> documentContents, AnalysisStorage analysisStorage)
         {
             _documentContents = documentContents;
+            _analysisStorage = analysisStorage;
         }
 
         private readonly TextDocumentSelector _textDocumentSelector = new TextDocumentSelector(
@@ -40,20 +43,23 @@ namespace WorldBoxModdingToolChain.Handlers
 
         public override async Task<MediatR.Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
         {
+
             FileLogger.Log($"Document opened: {request.TextDocument.Uri}");
             _documentContents[(Uri)request.TextDocument.Uri] = request.TextDocument.Text.Split('\n');
+            AnalyzeAndStoreVariables((Uri)request.TextDocument.Uri, request.TextDocument.Text);
+
             await Task.Yield();
             return MediatR.Unit.Value;
         }
 
         public override Task<MediatR.Unit> Handle(DidChangeTextDocumentParams request, CancellationToken cancellationToken)
         {
+            var documentUri = (Uri)request.TextDocument.Uri;
             FileLogger.Log($"Document changed: {request.TextDocument.Uri}");
 
             foreach (var change in request.ContentChanges)
             {
-                // In a simple case, replace the whole document content
-                _documentContents[(Uri)request.TextDocument.Uri] = change.Text.Split('\n');
+                _documentContents[documentUri] = change.Text.Split('\n');
             }
 
             return MediatR.Unit.Task;
@@ -61,8 +67,10 @@ namespace WorldBoxModdingToolChain.Handlers
 
         public override Task<MediatR.Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken)
         {
+            var documentUri = (Uri)request.TextDocument.Uri;
             FileLogger.Log($"Document saved: {request.TextDocument.Uri}");
-
+            var documentText = string.Join("\n", _documentContents[documentUri]);
+            AnalyzeAndStoreVariables(documentUri, documentText);
             return MediatR.Unit.Task;
         }
 
@@ -71,6 +79,14 @@ namespace WorldBoxModdingToolChain.Handlers
             FileLogger.Log($"Document closed: {request.TextDocument.Uri}");
             return MediatR.Unit.Task;
         }
+
+        private void AnalyzeAndStoreVariables(Uri documentUri, string documentText)
+        {
+            var analysisResults = VariableAnalyzer.GetVariableDictionary(documentText);
+            _analysisStorage.UpdateVariables(documentUri, analysisResults);
+
+        }
+
 
         protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(TextSynchronizationCapability capability, ClientCapabilities clientCapabilities)
         {
