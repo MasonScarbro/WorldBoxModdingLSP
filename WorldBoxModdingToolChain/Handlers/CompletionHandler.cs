@@ -84,8 +84,14 @@ namespace WorldBoxModdingToolChain.Handlers
                             memberNames,
                             fields_and_properties
                         );
+
+                RafactorToVariableTypes(correctedMemberNames);
+
                 FileLogger.Log("Corrected MemberNames: " + string.Join(", ", correctedMemberNames));
                 var targetClass = correctedMemberNames[0].Trim();
+
+                
+
                 if (fields_and_properties.ContainsKey(targetClass))
                 {
                     FileLogger.Log($"Class '{targetClass}' found, fetching members...");
@@ -160,14 +166,8 @@ namespace WorldBoxModdingToolChain.Handlers
             while (wordsBeforeDot.Count > 1)
             {
                 FileLogger.Log($"We are inside the while with count: {wordsBeforeDot.Count}");
-                if (_analysisStorage.GetCurrentDocumentVariables().TryGetValue(wordsBeforeDot[0], out string variableType))
-                {
-                    FileLogger.Log($"Changed {wordsBeforeDot[0]} to {variableType}");
-                    //if the type is found simply change the word to the type so we can
-                    //check the class
-                    wordsBeforeDot[0] = variableType;
-                    
-                }
+
+                RafactorToVariableTypes(wordsBeforeDot);
 
                 if (fields_and_properties.ContainsKey(wordsBeforeDot[0]))
                 {
@@ -241,7 +241,17 @@ namespace WorldBoxModdingToolChain.Handlers
             
         }
 
+        private void RafactorToVariableTypes(List<string> correctedMemberNames)
+        {
+            if (_analysisStorage.GetCurrentDocumentVariables().TryGetValue(correctedMemberNames[0], out string variableType))
+            {
+                FileLogger.Log($"Changed {correctedMemberNames[0]} to {variableType}");
+                //if the type is found simply change the word to the type so we can
+                //check the class
+                correctedMemberNames[0] = variableType;
 
+            }
+        }
         private bool IsDelimiter(char c)
         {
             return char.IsWhiteSpace(c) || c == '.' || c == '[' || c == ']' || c == '(' || c == ')';
