@@ -1,4 +1,5 @@
 ﻿using MediatR;
+using Microsoft.CodeAnalysis.Text;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -18,10 +19,10 @@ namespace WorldBoxModdingToolChain.Handlers
 {
     public class TextDocumentHandler : TextDocumentSyncHandlerBase
     {
-        private readonly IDictionary<Uri, string[]> _documentContents;
+        private readonly IDictionary<Uri, SourceText> _documentContents;
         private readonly AnalysisStorage _analysisStorage;
 
-        public TextDocumentHandler(IDictionary<Uri, string[]> documentContents, AnalysisStorage analysisStorage)
+        public TextDocumentHandler(IDictionary<Uri, SourceText> documentContents, AnalysisStorage analysisStorage)
         {
             _documentContents = documentContents;
             _analysisStorage = analysisStorage;
@@ -45,7 +46,8 @@ namespace WorldBoxModdingToolChain.Handlers
         {
 
             FileLogger.Log($"Document opened: {request.TextDocument.Uri}");
-            _documentContents[(Uri)request.TextDocument.Uri] = request.TextDocument.Text.Split('\n');
+            var sourceText = SourceText.From(request.TextDocument.Text);
+            _documentContents[(Uri)request.TextDocument.Uri] = sourceText;
             AnalyzeAndStoreVariables((Uri)request.TextDocument.Uri, request.TextDocument.Text);
 
             await Task.Yield();
@@ -59,7 +61,8 @@ namespace WorldBoxModdingToolChain.Handlers
 
             foreach (var change in request.ContentChanges)
             {
-                _documentContents[documentUri] = change.Text.Split('\n');
+                var sourceText = SourceText.From(change.Text);
+                _documentContents[documentUri] = sourceText;
             }
 
             return MediatR.Unit.Task;
@@ -67,6 +70,7 @@ namespace WorldBoxModdingToolChain.Handlers
 
         public override Task<MediatR.Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken)
         {
+            
             var documentUri = (Uri)request.TextDocument.Uri;
             FileLogger.Log($"Document saved: {request.TextDocument.Uri}");
             var documentText = string.Join("\n", _documentContents[documentUri]);
