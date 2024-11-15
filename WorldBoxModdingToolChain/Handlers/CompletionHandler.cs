@@ -71,6 +71,7 @@ namespace WorldBoxModdingToolChain.Handlers
             var completionItems = new List<CompletionItem>();
             List<string> memberNames = new List<string>();
             var fields_and_properties = _metaDataRender.GetFieldsAndProperties();
+            var instanceClassesAndProperties = _metaDataRender.GetInstanceCreatableClasses();
             
             //handles member accessing generation 
             if (tokenAtCursor.Parent is MemberAccessExpressionSyntax memberAccess)
@@ -127,7 +128,7 @@ namespace WorldBoxModdingToolChain.Handlers
                                 {
                                     Label = metadata.Name,
                                     Kind = metadata.Kind,
-                                    Documentation = $"Type: {metadata.TypeName()}",
+                                    Documentation = metadata.Documentation,
                                     InsertText = GetProperInsertText(metadata.Name, metadata.Kind)
 
                                 }
@@ -140,8 +141,7 @@ namespace WorldBoxModdingToolChain.Handlers
                 }
             }
             //handles inline object creation ex: new SomeObj {} and gets the fields
-            if (tokenAtCursor.Parent is ObjectCreationExpressionSyntax ||
-                tokenAtCursor.Parent.Ancestors().OfType<ObjectCreationExpressionSyntax>().Any())
+            if (IsObjectCreation(tokenAtCursor))
             {
                 var objectCreation = tokenAtCursor.Parent.AncestorsAndSelf()
                 .OfType<ObjectCreationExpressionSyntax>()
@@ -151,9 +151,7 @@ namespace WorldBoxModdingToolChain.Handlers
                 if (objectCreation != null)
                 {
                     // Check if the cursor is within the initializer span
-                    if (objectCreation.Initializer != null &&
-                        absolutePosition >= objectCreation.Initializer.SpanStart &&
-                        absolutePosition <= objectCreation.Initializer.Span.End)
+                    if (IsWithinBrace(objectCreation, absolutePosition))
                     {
                         FileLogger.Log("Cursor inside ObjectCreationExpressionSyntax initializer.");
                         var objectType = objectCreation.Type;
@@ -162,10 +160,10 @@ namespace WorldBoxModdingToolChain.Handlers
                             // You can get the name of the object type
                             var objectName = objectType.ToString(); // This will give the full type name
                             FileLogger.Log($"Object type being created: {objectName}");
-                            if (fields_and_properties.ContainsKey(objectName))
+                            if (instanceClassesAndProperties.ContainsKey(objectName))
                             {
                                 FileLogger.Log($"Class '{objectName}' found, fetching members...");
-                                var members = fields_and_properties[objectName];
+                                var members = instanceClassesAndProperties[objectName];
 
                                 foreach (GameClassMetaObject metadata in members)
                                 {
@@ -175,7 +173,8 @@ namespace WorldBoxModdingToolChain.Handlers
                                             {
                                                 Label = metadata.Name,
                                                 Kind = metadata.Kind,
-                                                Documentation = $"Type: {metadata.TypeName()}",
+                                                Documentation = metadata.Documentation,
+                                                Detail = metadata.ToString(),
                                                 InsertText = GetProperInsertText(metadata.Name, metadata.Kind)
 
                                             }
@@ -351,6 +350,21 @@ namespace WorldBoxModdingToolChain.Handlers
             return name + (kind == CompletionItemKind.Method ? "()" : "");
         }
 
-        
+        #region Truthy&Falsey
+
+        public bool IsObjectCreation(SyntaxToken tokenAtCursor)
+        {
+            return tokenAtCursor.Parent is ObjectCreationExpressionSyntax || tokenAtCursor.Parent.Ancestors().OfType<ObjectCreationExpressionSyntax>().Any();
+        }
+
+        public bool IsWithinBrace(ObjectCreationExpressionSyntax objectCreation, int absolutePosition)
+        {
+            return objectCreation.Initializer != null &&
+                        absolutePosition >= objectCreation.Initializer.SpanStart &&
+                        absolutePosition <= objectCreation.Initializer.Span.End;
+        }
+
+        #endregion
+
     }
 }

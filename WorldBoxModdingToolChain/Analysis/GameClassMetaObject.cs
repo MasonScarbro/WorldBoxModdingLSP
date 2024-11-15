@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using WorldBoxModdingToolChain.Utils;
 
 namespace WorldBoxModdingToolChain.Analysis
 {
@@ -12,12 +13,22 @@ namespace WorldBoxModdingToolChain.Analysis
     {
         public string Name { get; set; }
         public TypeReference? ReturnType { get; set; }
+
+        public string? Parameters { get; set; }
         public CompletionItemKind Kind { get; set; }
-        public GameClassMetaObject(string name, TypeReference returnType, CompletionItemKind kind)
+
+        public MarkupContent Documentation { get; }
+        public GameClassMetaObject(string name, TypeReference returnType, CompletionItemKind kind, string parameters = null)
         {
             Name= name;
             ReturnType= returnType;
             Kind= kind;
+            Parameters = parameters;
+            Documentation = new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = ToString()
+            };
         }
 
        
@@ -26,7 +37,32 @@ namespace WorldBoxModdingToolChain.Analysis
 
         public string KindName() => Kind.ToString();
 
-        public override string ToString() =>
-        $"{Name} ({TypeName()}) - {KindName()}";
+        
+
+        public override string ToString()
+        {
+            var result = $@"
+### {Name}
+- **Type:** `{TypeName()}`
+";
+
+            // Add parameters if available
+            if (!string.IsNullOrEmpty(Parameters))
+            {
+                result += $@"
+- **Parameters:** {Parameters}
+";
+                
+            }
+
+            // Add method kind info
+            result += $@"
+- **Kind:** `{KindName()}`
+
+This is an auto-generated member of type `{TypeName()}`.
+";
+
+            return result;
+        }
     }
 }
