@@ -72,6 +72,7 @@ namespace WorldBoxModdingToolChain.Handlers
             List<string> memberNames = new List<string>();
             var fields_and_properties = _metaDataRender.GetFieldsAndProperties();
             var instanceClassesAndProperties = _metaDataRender.GetInstanceCreatableClasses();
+
             
             //handles member accessing generation 
             if (tokenAtCursor.Parent is MemberAccessExpressionSyntax memberAccess)
@@ -223,7 +224,7 @@ namespace WorldBoxModdingToolChain.Handlers
 
         }
 
-        //TODO: Add Scan for word to appear in Dictionary of variables (with Associated Type)
+        
 
         private List<CompletionItem> GetClassCompletionItems(string prefix)
         {

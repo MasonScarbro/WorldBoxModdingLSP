@@ -59,6 +59,22 @@ namespace WorldBoxModdingToolChain.Analysis
                 
             }
 
+            var methodDeclarations = root.DescendantNodes().OfType<MethodDeclarationSyntax>();
+
+            foreach (var methodDeclaration in methodDeclarations)
+            {
+                foreach (var parameter in methodDeclaration.ParameterList.Parameters)
+                {
+                    // You can include parameters in the variableTypes dictionary
+                    var paramName = parameter.Identifier.Text;
+                    var paramType = parameter.Type.ToString();
+
+                    // Add parameter to the dictionary (you can also log them if needed)
+                    variableTypes[paramName] = paramType;
+                    FileLogger.Log($"Parameter: {paramName}, Type: {paramType}");
+                }
+            }
+
             var assignments = root.DescendantNodes().OfType<AssignmentExpressionSyntax>();
 
             foreach ( var assignment in assignments)
