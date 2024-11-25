@@ -16,8 +16,8 @@ namespace WorldBoxModdingToolChain
         
         public static async Task Main(string[] args)
         {
-            
-
+                
+            //TODO: The asm and the decompiled folder path need to be gathered dynamically!
             FileLogger.Initialize("C:\\Users\\Admin\\source\\repos\\WorldBoxModdingLSP\\WorldBoxModdingToolChain\\Logs\\debug.txt", "[Program]"); // For debugging
             FileLogger.Log("Starting LSP server...");
 
@@ -31,9 +31,11 @@ namespace WorldBoxModdingToolChain
                         .WithOutput(Console.OpenStandardOutput())
                         .WithHandler<TextDocumentHandler>()
                         .WithHandler<CompletionHandler>()
+                        .WithHandler<DefinitionHandler>()
                         .WithServices(services =>
                         {
                             services.AddSingleton(new GameCodeMetaDataRender("C:\\Program Files (x86)\\Steam\\steamapps\\common\\worldbox\\worldbox_Data\\Managed\\Assembly-CSharp.dll"));
+                            services.AddSingleton(new ClassDecompiler("C:\\Program Files (x86)\\Steam\\steamapps\\common\\worldbox\\worldbox_Data\\Managed\\Assembly-CSharp.dll"));
                             services.AddSingleton<IDictionary<Uri, SourceText>>(new Dictionary<Uri, SourceText>());
                             services.AddSingleton(new AnalysisStorage());
                         })

@@ -81,6 +81,36 @@ namespace WorldBoxModdingToolChain.Handlers
         public override Task<MediatR.Unit> Handle(DidCloseTextDocumentParams request, CancellationToken cancellationToken)
         {
             FileLogger.Log($"Document closed: {request.TextDocument.Uri}");
+
+            var filePath = DocumentUri.GetFileSystemPath(request.TextDocument.Uri);
+
+            // TODO: get the folder path dynamically on startup
+            var decompiledFolderPath = @"C:\Users\Admin\source\repos\WorldBoxModdingLSP\WorldBoxModdingToolChain\Decompiled\";
+
+            if (filePath.StartsWith(decompiledFolderPath, StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    if (File.Exists(filePath))
+                    {
+                        File.Delete(filePath);
+                        FileLogger.Log($"Deleted decompiled file: {filePath}");
+                    }
+                    else
+                    {
+                        FileLogger.Log($"File not found for deletion: {filePath}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FileLogger.Log($"Error deleting file: {ex.Message}");
+                }
+            }
+            else
+            {
+                FileLogger.Log($"Closed file is not in the decompiled folder: {filePath}");
+            }
+
             return MediatR.Unit.Task;
         }
 

@@ -12,6 +12,7 @@ namespace WorldBoxModdingToolChain.Analysis
 {
     public class GameCodeMetaDataRender
     {
+        
         private Dictionary<string, List<GameClassMetaObject>> ClassesMetaData = new Dictionary<string, List<GameClassMetaObject>>(StringComparer.OrdinalIgnoreCase);
         private List<string> StaticClasses = new List<string>();
         private Dictionary<string, List<GameClassMetaObject>> InstanceCreatableClassesMetaData = new Dictionary<string, List<GameClassMetaObject>>(StringComparer.OrdinalIgnoreCase);
@@ -24,6 +25,8 @@ namespace WorldBoxModdingToolChain.Analysis
         private void LoadGameAssembly(string asmPath)
         {
             var asm = AssemblyDefinition.ReadAssembly(asmPath);
+
+            
 
             foreach (var module in asm.Modules)
             {
@@ -89,19 +92,16 @@ namespace WorldBoxModdingToolChain.Analysis
                     {
                         InstanceCreatableClassesMetaData[type.Name] = instanceFields.Concat(instanceProperties).ToList();
                     }
+
+                    //ProcessDecompiledCode(type, decompiler);
+
                 }
             }
-            //TEST
-            //foreach (string klass in ClassesMetaData.Keys)
-            //{
-            //    for (int i = 0; i < ClassesMetaData[klass].Count; i++)
-            //    {
-            //        FileLogger.Log("Meta Data for" + klass + ClassesMetaData[klass][i].ToString());
-            //    }
-
-            //}
-            //PrettyPrintInstanceCreatableClasses();
+            
+            
         }
+
+        
 
         public Dictionary<string, List<GameClassMetaObject>> GetFieldsAndProperties() => ClassesMetaData;
         public List<string> GetClasses() => ClassesMetaData.Keys.ToList();
@@ -110,19 +110,7 @@ namespace WorldBoxModdingToolChain.Analysis
 
         public Dictionary<string, List<GameClassMetaObject>> GetInstanceCreatableClasses() => InstanceCreatableClassesMetaData;
 
-        //public void PrettyPrintInstanceCreatableClasses()
-        //{
-        //    FileLogger.Log("=== Non-Static Classes with Editable Fields and Properties ===");
-        //    foreach (var kvp in InstanceCreatableClassesMetaData)
-        //    {
-        //        FileLogger.Log($"Class: {kvp.Key}");
-        //        foreach (var metaObject in kvp.Value)
-        //        {
-        //            string kind = metaObject.Kind == CompletionItemKind.Field ? "Field" : "Property";
-        //            FileLogger.Log($"  - {kind}: {metaObject.Name}");
-        //        }
-
-        //    }
-        //}
+       
+        
     }
 }
