@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
@@ -77,6 +78,7 @@ namespace WorldBoxModdingToolChain.Handlers
             //handles member accessing generation 
             if (tokenAtCursor.Parent is MemberAccessExpressionSyntax memberAccess)
             {
+                //TODO: Make this a function for reuse
                 while (memberAccess != null)
                 {
                     // Add the right side of the member access (e.g., "foo" or "bar")
@@ -144,6 +146,7 @@ namespace WorldBoxModdingToolChain.Handlers
             //handles inline object creation ex: new SomeObj {} and gets the fields
             if (IsObjectCreation(tokenAtCursor))
             {
+                //TODO: Make this a function as well we will need to reuse it for parens
                 var objectCreation = tokenAtCursor.Parent.AncestorsAndSelf()
                 .OfType<ObjectCreationExpressionSyntax>()
                 .FirstOrDefault();
@@ -198,6 +201,81 @@ namespace WorldBoxModdingToolChain.Handlers
                 else
                 {
                     FileLogger.Log("No ObjectCreationExpressionSyntax found at cursor position.");
+                }
+            }
+            if (tokenAtCursor.Parent is ArgumentListSyntax argumentList)
+            {
+                FileLogger.Log("Cursor is inside parentheses? " + tokenAtCursor.Parent);
+                if (argumentList.Parent is InvocationExpressionSyntax invocation)
+                {
+                    FileLogger.Log("Cursor is inside parentheses of a method call. " + argumentList.Parent);
+
+                    // this gets the actual name of teh call (ex: foo() this gets foo) just in case i might need this
+                    if (invocation.Expression is IdentifierNameSyntax identifier)
+                    {
+                        FileLogger.Log($"Found identifier in method call: {identifier.Identifier.Text}");
+                    }
+
+                    foreach (var argument in argumentList.Arguments)
+                    {
+                        // The `Expression` property contains the argument (e.g., variable names or literals)
+                        var argumentExpression = argument.Expression;
+
+                        
+                        FileLogger.Log("Argument inside parentheses: " + argumentExpression.ToString());
+
+                        // If the argument a member access handle it differently
+                        if (argumentExpression is IdentifierNameSyntax argIdentifier)
+                        {
+                            FileLogger.Log($"Found argument identifier: {argIdentifier.Identifier.Text}");
+                            // maybe do something different here
+                            
+                        }
+                        //else if (argumentExpression is MemberAccessExpressionSyntax memberAccess)
+                        //{
+                        //    FileLogger.Log($"Found member access in argument: {memberAccess}");
+                        //    // Handle member access for suggestions
+                        //}
+                        completionItems.AddRange(
+                                GetClassCompletionItems(argumentExpression.ToString())
+                                );
+                    }
+                }
+            }
+            if (tokenAtCursor.Parent is BracketedArgumentListSyntax bracketedArgumentList)
+            {
+                if (bracketedArgumentList.Parent is ElementAccessExpressionSyntax elementAccess)
+                {
+                    //the name of the arr
+                    if (elementAccess.Expression is IdentifierNameSyntax identifier)
+                    {
+                        FileLogger.Log($"Found identifier in array access: {identifier.Identifier.Text}");
+                    }
+                    foreach (var argument in bracketedArgumentList.Arguments)
+                    {
+                        var argumentExpression = argument.Expression;
+
+                        // Log the argument text
+                        FileLogger.Log("Argument inside brackets: " + argumentExpression.ToString());
+
+                        // If the argument is a variable or member access, handle it
+                        if (argumentExpression is IdentifierNameSyntax argIdentifier)
+                        {
+                            FileLogger.Log($"Found argument identifier: {argIdentifier.Identifier.Text}");
+                            // Add completion suggestions if needed
+                        }
+                        else if (argumentExpression is LiteralExpressionSyntax literal)
+                        {
+                            FileLogger.Log($"Found literal inside brackets: {literal.Token.ValueText}");
+                        }
+                        completionItems.AddRange(
+                                GetClassCompletionItems(argumentExpression.ToString())
+                                );
+                        //else if (argumentExpression is MemberAccessExpressionSyntax memberAccess)
+                        //{
+                        //    FileLogger.Log($"Found member access in bracket argument: {memberAccess}");
+                        //}
+                    }
                 }
             }
             else

@@ -13,6 +13,7 @@ using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis;
 using WorldBoxModdingToolChain.Utils;
 using WorldBoxModdingToolChain.Analysis;
+using System.Collections;
 
 namespace WorldBoxModdingToolChain.Handlers
 {
@@ -87,12 +88,48 @@ namespace WorldBoxModdingToolChain.Handlers
             var word = line.Substring(start, end - start);
             FileLogger.Log($"Extracted word: {word}");
             #endregion
+            return GetLocationFromWord(word);
+        }
 
+        private LocationOrLocationLinks GetLocationFromWord(string word)
+        {
+            //if its trying to access we need to do analyze it
+            if (word.Contains('.'))
+            {
+                var accessors = word.Split('.');
+                //if its only length two just find it in the class code
+                if (accessors.Length == 2)
+                {
+                    var classWord = accessors[0];
+                    _classDecompiler.DecompileByClass(classWord);
+                    var classCode = _classDecompiler.GetDecompiledCode(classWord);
+                    if (classCode.Contains(accessors[1]))
+                    {
+                        var startIdx = classCode.IndexOf(accessors[1]);
+                        if (startIdx != -1)
+                        {
+                            FileLogger.Log($"Found '{accessors[1]}' at Start: {new Position(0, startIdx).Character}, End: {startIdx + accessors[1].Length}");
+                            return GetAppropiateLocation(classCode, classWord, startIdx, (startIdx + accessors[1].Length));
+                        }
+
+                    }
+                    
+                }
+                //TODO: Trace Foward to find refernce in class
+                if (accessors.Length > 2)
+                {
+
+                }
+            }
+            //else
             _classDecompiler.DecompileByClass(word);
-
             var code = _classDecompiler.GetDecompiledCode(word);
-            FileLogger.Log("Code: \n" + code);
+            return GetAppropiateLocation(code, word);
 
+        }
+
+        private LocationOrLocationLinks GetAppropiateLocation(string code, string word, int start = 0, int end = 0)
+        {
             if (code != null)
             {
                 // TODO: get the folder path dynamically on startup
@@ -106,20 +143,19 @@ namespace WorldBoxModdingToolChain.Handlers
                             Uri = decompiledUri,
                             Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range
                             {
-                                Start = new Position(0, 0),
-                                End = new Position(0, 0)
+                                Start = new Position(0, start),
+                                End = new Position(0, end)
                             }
                         }
                     );
-            } 
-            
-            
-
+            }
             return new LocationOrLocationLinks();
         }
+
         private static bool IsBoundaryChar(char c)
         {
-            return char.IsPunctuation(c) || char.IsSymbol(c);
+            //Excluding periods
+            return (char.IsPunctuation(c) && c != '.') || char.IsSymbol(c);
         }
         public DefinitionRegistrationOptions GetRegistrationOptions(DefinitionCapability capability, ClientCapabilities clientCapabilities)
         {
