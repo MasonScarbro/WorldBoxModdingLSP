@@ -78,70 +78,12 @@ namespace WorldBoxModdingToolChain.Handlers
             //handles member accessing generation 
             if (tokenAtCursor.Parent is MemberAccessExpressionSyntax memberAccess)
             {
-                //TODO: Make this a function for reuse
-                while (memberAccess != null)
-                {
-                    // Add the right side of the member access (e.g., "foo" or "bar")
-                    memberNames.Insert(0, memberAccess.Name.Identifier.Text);
-
-                    // Move to the left side of the member access (could be another MemberAccessExpression or Identifier)
-                    if (memberAccess.Expression is MemberAccessExpressionSyntax nestedAccess)
-                    {
-                        FileLogger.Log("Is Nested Access");
-                        memberAccess = nestedAccess;
-                    }
-                    else if (memberAccess.Expression is IdentifierNameSyntax identifier)
-                    {
-                        // Reached the root of the chain (e.g., "b")
-                        FileLogger.Log("Found Root: " + identifier.Identifier.Text);
-                        memberNames.Insert(0, identifier.Identifier.Text);
-                        break;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                memberNames = memberNames.Where(name => !string.IsNullOrWhiteSpace(name)).ToList();
-
-                FileLogger.Log("Filtered MemberNames Before TraceLookup: " + string.Join(", ", memberNames));
-                var correctedMemberNames = TraceLookupClassGeneration
-                        (
-                            memberNames,
-                            fields_and_properties
-                        );
-
-                RafactorToVariableTypes(correctedMemberNames);
-
-                FileLogger.Log("Corrected MemberNames: " + string.Join(", ", correctedMemberNames));
-                var targetClass = correctedMemberNames[0].Trim();
-
-                
-
-                if (fields_and_properties.ContainsKey(targetClass))
-                {
-                    FileLogger.Log($"Class '{targetClass}' found, fetching members...");
-                    var members = fields_and_properties[targetClass];
-
-                    foreach (GameClassMetaObject metadata in members)
-                    {
-                        completionItems.Add
-                            (
-                                new CompletionItem
-                                {
-                                    Label = metadata.Name,
-                                    Kind = metadata.Kind,
-                                    Documentation = metadata.Documentation,
-                                    InsertText = GetProperInsertText(metadata.Name, metadata.Kind)
-
-                                }
-                            );
-                    }
-                }
-                else
-                {
-                    FileLogger.Log($"Word Before Dot '{targetClass}' was NOT in the list of classes.");
-                }
+                HandleMemberAcces(
+                    memberAccess,
+                    completionItems,
+                    memberNames, 
+                    fields_and_properties
+                    );
             }
             //handles inline object creation ex: new SomeObj {} and gets the fields
             if (IsObjectCreation(tokenAtCursor))
@@ -231,11 +173,16 @@ namespace WorldBoxModdingToolChain.Handlers
                             // maybe do something different here
                             
                         }
-                        //else if (argumentExpression is MemberAccessExpressionSyntax memberAccess)
-                        //{
-                        //    FileLogger.Log($"Found member access in argument: {memberAccess}");
-                        //    // Handle member access for suggestions
-                        //}
+                        else if (argumentExpression is MemberAccessExpressionSyntax memberAccessP)
+                        {
+                            FileLogger.Log($"Found member access in argument: {memberAccessP}");
+                            HandleMemberAcces(
+                                memberAccessP,
+                                completionItems,
+                                memberNames,
+                                fields_and_properties
+                                );
+                        }
                         completionItems.AddRange(
                                 GetClassCompletionItems(argumentExpression.ToString())
                                 );
@@ -268,13 +215,20 @@ namespace WorldBoxModdingToolChain.Handlers
                         {
                             FileLogger.Log($"Found literal inside brackets: {literal.Token.ValueText}");
                         }
+                        else if (argumentExpression is MemberAccessExpressionSyntax memberAccessB)
+                        {
+                            FileLogger.Log($"Found member access in bracket argument: {memberAccessB}");
+                            HandleMemberAcces(
+                                memberAccessB,
+                                completionItems,
+                                memberNames,
+                                fields_and_properties
+                                );
+                        }
                         completionItems.AddRange(
                                 GetClassCompletionItems(argumentExpression.ToString())
                                 );
-                        //else if (argumentExpression is MemberAccessExpressionSyntax memberAccess)
-                        //{
-                        //    FileLogger.Log($"Found member access in bracket argument: {memberAccess}");
-                        //}
+                        
                     }
                 }
             }
@@ -302,7 +256,73 @@ namespace WorldBoxModdingToolChain.Handlers
 
         }
 
-        
+        private void HandleMemberAcces(MemberAccessExpressionSyntax memberAccess, List<CompletionItem> completionItems, List<string> memberNames, Dictionary<string, List<GameClassMetaObject>> fields_and_properties)
+        {
+            while (memberAccess != null)
+            {
+                // Add the right side of the member access (e.g., "foo" or "bar")
+                memberNames.Insert(0, memberAccess.Name.Identifier.Text);
+
+                // Move to the left side of the member access (could be another MemberAccessExpression or Identifier)
+                if (memberAccess.Expression is MemberAccessExpressionSyntax nestedAccess)
+                {
+                    FileLogger.Log("Is Nested Access");
+                    memberAccess = nestedAccess;
+                }
+                else if (memberAccess.Expression is IdentifierNameSyntax identifier)
+                {
+                    // Reached the root of the chain (e.g., "b")
+                    FileLogger.Log("Found Root: " + identifier.Identifier.Text);
+                    memberNames.Insert(0, identifier.Identifier.Text);
+                    break;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            memberNames = memberNames.Where(name => !string.IsNullOrWhiteSpace(name)).ToList();
+
+            FileLogger.Log("Filtered MemberNames Before TraceLookup: " + string.Join(", ", memberNames));
+            var correctedMemberNames = TraceLookupClassGeneration
+                    (
+                        memberNames,
+                        fields_and_properties
+                    );
+
+            RafactorToVariableTypes(correctedMemberNames);
+
+            FileLogger.Log("Corrected MemberNames: " + string.Join(", ", correctedMemberNames));
+            var targetClass = correctedMemberNames[0].Trim();
+
+
+
+            if (fields_and_properties.ContainsKey(targetClass))
+            {
+                FileLogger.Log($"Class '{targetClass}' found, fetching members...");
+                var members = fields_and_properties[targetClass];
+
+                foreach (GameClassMetaObject metadata in members)
+                {
+                    completionItems.Add
+                        (
+                            new CompletionItem
+                            {
+                                Label = metadata.Name,
+                                Kind = metadata.Kind,
+                                Documentation = metadata.Documentation,
+                                InsertText = GetProperInsertText(metadata.Name, metadata.Kind)
+
+                            }
+                        );
+                }
+            }
+            else
+            {
+                FileLogger.Log($"Word Before Dot '{targetClass}' was NOT in the list of classes.");
+            }
+        }
+
 
         private List<CompletionItem> GetClassCompletionItems(string prefix)
         {
@@ -420,17 +440,17 @@ namespace WorldBoxModdingToolChain.Handlers
 
             }
         }
-        private bool IsDelimiter(char c)
-        {
-            return char.IsWhiteSpace(c) || c == '.' || c == '[' || c == ']' || c == '(' || c == ')';
-        }
+        
         public string GetProperInsertText(string name, CompletionItemKind kind)
         {
             return name + (kind == CompletionItemKind.Method ? "()" : "");
         }
 
         #region Truthy&Falsey
-
+        private bool IsDelimiter(char c)
+        {
+            return char.IsWhiteSpace(c) || c == '.' || c == '[' || c == ']' || c == '(' || c == ')';
+        }
         public bool IsObjectCreation(SyntaxToken tokenAtCursor)
         {
             return tokenAtCursor.Parent is ObjectCreationExpressionSyntax || tokenAtCursor.Parent.Ancestors().OfType<ObjectCreationExpressionSyntax>().Any();
