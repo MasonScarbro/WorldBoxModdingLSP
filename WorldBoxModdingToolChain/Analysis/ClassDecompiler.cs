@@ -49,6 +49,15 @@ namespace WorldBoxModdingToolChain.Analysis
 
         }
 
-        public string GetDecompiledCode(string className) => DecompiledClasses[className];
+        public string GetDecompiledCode(string className)
+        {
+            if (DecompiledClasses.ContainsKey(className))
+            {
+                return DecompiledClasses[className];
+            }
+            //else
+            return "";
+            
+        }
     }
 }

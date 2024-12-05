@@ -101,7 +101,9 @@ namespace WorldBoxModdingToolChain.Handlers
                 if (accessors.Length == 2)
                 {
                     var classWord = accessors[0];
+                    
                     _classDecompiler.DecompileByClass(classWord);
+                    
                     var classCode = _classDecompiler.GetDecompiledCode(classWord);
                     if (classCode.Contains(accessors[1]))
                     {
@@ -124,6 +126,7 @@ namespace WorldBoxModdingToolChain.Handlers
             //else
             _classDecompiler.DecompileByClass(word);
             var code = _classDecompiler.GetDecompiledCode(word);
+            if (code == string.Empty) return new LocationOrLocationLinks();
             return GetAppropiateLocation(code, word);
 
         }

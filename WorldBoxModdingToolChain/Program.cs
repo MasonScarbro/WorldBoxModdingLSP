@@ -34,6 +34,7 @@ namespace WorldBoxModdingToolChain
                         .WithHandler<DefinitionHandler>()
                         .WithServices(services =>
                         {
+                            services.AddSingleton(new GreaterSuggestions());
                             services.AddSingleton(new GameCodeMetaDataRender("C:\\Program Files (x86)\\Steam\\steamapps\\common\\worldbox\\worldbox_Data\\Managed\\Assembly-CSharp.dll"));
                             services.AddSingleton(new ClassDecompiler("C:\\Program Files (x86)\\Steam\\steamapps\\common\\worldbox\\worldbox_Data\\Managed\\Assembly-CSharp.dll"));
                             services.AddSingleton<IDictionary<Uri, SourceText>>(new Dictionary<Uri, SourceText>());

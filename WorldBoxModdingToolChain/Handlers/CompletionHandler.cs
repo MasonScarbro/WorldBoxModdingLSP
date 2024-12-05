@@ -27,11 +27,13 @@ namespace WorldBoxModdingToolChain.Handlers
         private readonly GameCodeMetaDataRender _metaDataRender;
         private readonly IDictionary<Uri, SourceText> _documentContents;
         private readonly AnalysisStorage _analysisStorage;
-        public CompletionHandler(GameCodeMetaDataRender metaDataRender, IDictionary<Uri, SourceText> documentContents, AnalysisStorage analysisStorage)
+        private readonly GreaterSuggestions _greaterSuggestions;
+        public CompletionHandler(GameCodeMetaDataRender metaDataRender, IDictionary<Uri, SourceText> documentContents, AnalysisStorage analysisStorage, GreaterSuggestions greaterSuggestions)
         {
             _metaDataRender = metaDataRender;
             _documentContents = documentContents;
             _analysisStorage = analysisStorage;
+            _greaterSuggestions = greaterSuggestions;
         }
 
         public CompletionRegistrationOptions GetRegistrationOptions(CompletionCapability capability, ClientCapabilities clientCapabilities)
@@ -74,8 +76,10 @@ namespace WorldBoxModdingToolChain.Handlers
             var fields_and_properties = _metaDataRender.GetFieldsAndProperties();
             var instanceClassesAndProperties = _metaDataRender.GetInstanceCreatableClasses();
 
+            //major fillers
             
             //handles member accessing generation 
+
             if (tokenAtCursor.Parent is MemberAccessExpressionSyntax memberAccess)
             {
                 HandleMemberAcces(
@@ -242,9 +246,14 @@ namespace WorldBoxModdingToolChain.Handlers
                     )
                 );
             }
-            
-            
-            
+            FileLogger.Log($"Token at cursor: {tokenAtCursor.Text}");
+            if (tokenAtCursor.Text == "$" || GetCurrentTrimmedWord(GetCurrentLine(request)).StartsWith("$")) // Directly check for the dollar sign.
+            {
+                FileLogger.Log($"inside is dollar sign");
+                completionItems.Add(_greaterSuggestions.GetBoilerplate(tokenAtCursor.Text));
+            }
+
+
             FileLogger.Log("Dummy Handle Result: " + string.Join(", ", memberNames));
 
             
@@ -462,7 +471,12 @@ namespace WorldBoxModdingToolChain.Handlers
                         absolutePosition >= objectCreation.Initializer.SpanStart &&
                         absolutePosition <= objectCreation.Initializer.Span.End;
         }
-
+        private bool IsFirstTokenAtCursor(SyntaxToken token)
+        {
+            // Check if this token is the first token in the current line or expression.
+            var firstToken = token.Parent?.ChildTokens().FirstOrDefault();
+            return firstToken != null && firstToken.Equals(token);
+        }
         #endregion
 
     }
