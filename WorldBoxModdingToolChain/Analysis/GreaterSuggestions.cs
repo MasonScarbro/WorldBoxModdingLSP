@@ -11,27 +11,32 @@ namespace WorldBoxModdingToolChain.Analysis
 {
     public class GreaterSuggestions
     {
-        public Dictionary<string, string> GreaterSuggestionsDict = new Dictionary<string, string>
+        public Dictionary<string, Func<string?, string>> GreaterSuggestionsDict = new Dictionary<string, Func<string?, string>>
         {
             { 
                 "$Traits",
-                Constants.TraitsBoilerplate
+                (param) => Constants.TraitsBoilerplate + (param ?? string.Empty)
             },
             {
                 "$Effects",
-                Constants.EffectsBoilerplate
+                (param) => Constants.EffectsBoilerplate + (param ?? string.Empty)
             },
             {
                 "$Statuses",
-                Constants.StatusesBoilerplate
+                (param) => Constants.StatusesBoilerplate + (param ?? string.Empty)
             },
             {
                 "$Units",
-                Constants.UnitsBoilerplate
-            }
+                (param) => Constants.UnitsBoilerplate + (param ?? string.Empty)
+            },
+            {
+                "$NewTrait",
+                (param) => GetNewTraitCode(param)
+
+            },
         };
 
-        public CompletionItem GetBoilerplate(string command)
+        public CompletionItem GetBoilerplate(string command, string appendage="")
         {
             FileLogger.Log("Inside BoilerPlate and command is " + command);
             if (MostCharactersAreInKey(command, out string associatedKey))
@@ -42,7 +47,7 @@ namespace WorldBoxModdingToolChain.Analysis
                     Kind = CompletionItemKind.Keyword,
                     Documentation = "Boiler Plate code for the " + associatedKey,
                     InsertTextFormat = InsertTextFormat.Snippet,
-                    InsertText = GreaterSuggestionsDict[associatedKey]
+                    InsertText = GreaterSuggestionsDict[associatedKey](appendage)
 
                 };
             }
@@ -80,6 +85,28 @@ namespace WorldBoxModdingToolChain.Analysis
             FileLogger.Log("Closest Key " + closestKey);
             // Return true if we found a key with matching characters, otherwise false
             return maxMatchedCount > word.Length / 2;
+        }
+
+        public static string GetNewTraitCode(string variable)
+        {
+            FileLogger.Log($"New {variable} (INSIDE GETNEWTRAITCODE)");
+            if (variable == string.Empty) return "";
+            return $"new ActorTrait();\r\n" +
+                   $"{variable}.id = \"{variable}\";\r\n" +
+                   $"{variable}.path_icon = \"ui/icons/blessed\";\r\n" +
+                   $"{variable}.base_stats[S.damage] += 20f;\r\n" +
+                   $"{variable}.base_stats[S.health] += 550;\r\n" +
+                   $"{variable}.base_stats[S.attack_speed] += 3f;\r\n" +
+                   $"{variable}.base_stats[S.critical_chance] += 0.25f;\r\n" +
+                   $"{variable}.base_stats[S.scale] = 0.02f;\r\n" +
+                   $"{variable}.base_stats[S.dodge] += 3f;\r\n" +
+                   $"{variable}.base_stats[S.range] += 6f;\r\n" +
+                   $"//{variable}.action_attack_target = new AttackAction({variable}Attack);\r\n" +
+                   $"//{variable}.action_death = (WorldAction)Delegate.Combine({variable}.action_death, new WorldAction({variable}sDeath));\r\n" +
+                   $"//{variable}.action_special_effect = (WorldAction)Delegate.Combine({variable}.action_special_effect, new WorldAction({variable}EraStatus));\r\n" +
+                   $"AssetManager.traits.add({variable});\r\n" +
+                   $"PlayerConfig.unlockTrait({variable}.id);\r\n" +
+                   $"addTraitToLocalizedLibrary({variable}.id, \"Fill this out with a description of the trait\");";
         }
     }
 }

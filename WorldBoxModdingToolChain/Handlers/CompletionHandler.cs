@@ -49,37 +49,33 @@ namespace WorldBoxModdingToolChain.Handlers
 
         public Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
         {
+            // Retrieve and process document content
             var documentLines = _documentContents[(Uri)request.TextDocument.Uri];
-
-
-
             var documentText = string.Join(Environment.NewLine, documentLines);
-            FileLogger.Log("Docuemnt text: " + documentText);
+            FileLogger.Log("Docuemnt text: " + documentText); //testing
 
+            // Parse syntax tree and get root
             var syntaxTree = CSharpSyntaxTree.ParseText(documentText);
             var root = syntaxTree.GetRoot();
-
             var text = syntaxTree.GetText();
 
-
-
-
-
+            // Compute position details
             var absolutePosition = text.Lines.GetPosition(new Microsoft.CodeAnalysis.Text.LinePosition(request.Position.Line, request.Position.Character));
-            FileLogger.Log("Absolute Position: " + absolutePosition);
-
             var tokenAtCursor = root.FindToken(absolutePosition);
+            FileLogger.Log("Absolute Position: " + absolutePosition);
             FileLogger.Log("Token: " + tokenAtCursor);
 
+            // Certain Current line and word details
+            var currLine = GetCurrentLine(request);
+            var currTrimmedWord = GetCurrentTrimmedWord(currLine);
+
+            // Metadata and completion setup
             var completionItems = new List<CompletionItem>();
             List<string> memberNames = new List<string>();
             var fields_and_properties = _metaDataRender.GetFieldsAndProperties();
             var instanceClassesAndProperties = _metaDataRender.GetInstanceCreatableClasses();
-
-            //major fillers
             
             //handles member accessing generation 
-
             if (tokenAtCursor.Parent is MemberAccessExpressionSyntax memberAccess)
             {
                 HandleMemberAcces(
@@ -246,11 +242,14 @@ namespace WorldBoxModdingToolChain.Handlers
                     )
                 );
             }
-            FileLogger.Log($"Token at cursor: {tokenAtCursor.Text}");
-            if (tokenAtCursor.Text == "$" || GetCurrentTrimmedWord(GetCurrentLine(request)).StartsWith("$")) // Directly check for the dollar sign.
+            
+            //get grteater completions
+            if (tokenAtCursor.Text == "$" || GetCurrentTrimmedWord(GetCurrentLine(request)).Contains("$")) // Directly check for the dollar sign.
             {
-                FileLogger.Log($"inside is dollar sign");
-                completionItems.Add(_greaterSuggestions.GetBoilerplate(tokenAtCursor.Text));
+
+                FileLogger.Log($"Input {GetVariableFromDeclaration(GetCurrentLine(request))}");
+                var appendage = GetVariableFromDeclaration(GetCurrentLine(request));
+                completionItems.Add(_greaterSuggestions.GetBoilerplate(tokenAtCursor.Text, appendage));
             }
 
 
@@ -453,6 +452,21 @@ namespace WorldBoxModdingToolChain.Handlers
         public string GetProperInsertText(string name, CompletionItemKind kind)
         {
             return name + (kind == CompletionItemKind.Method ? "()" : "");
+        }
+
+        public string GetVariableFromDeclaration(string input)
+        {
+            
+            int equalIndex = input.IndexOf('=');
+
+            if (equalIndex > 0)
+            {
+                string substring = input.Substring(0, equalIndex).Trim();
+                string[] parts = substring.Split(' ');
+                string wordBeforeEqual = parts[^1]; // Last word before '='
+                return wordBeforeEqual; // Output: thisIsTheWordIWant
+            }
+            return "";
         }
 
         #region Truthy&Falsey
