@@ -1,6 +1,7 @@
 ﻿using MediatR;
 using Microsoft.CodeAnalysis.Text;
 using OmniSharp.Extensions.LanguageServer.Protocol;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -21,11 +22,12 @@ namespace WorldBoxModdingToolChain.Handlers
     {
         private readonly IDictionary<Uri, SourceText> _documentContents;
         private readonly AnalysisStorage _analysisStorage;
-
+        
         public TextDocumentHandler(IDictionary<Uri, SourceText> documentContents, AnalysisStorage analysisStorage)
         {
             _documentContents = documentContents;
             _analysisStorage = analysisStorage;
+            
         }
 
         private readonly TextDocumentSelector _textDocumentSelector = new TextDocumentSelector(
@@ -34,8 +36,8 @@ namespace WorldBoxModdingToolChain.Handlers
                 Pattern = "**/*.cs"
             }
         );
-        public TextDocumentSyncKind Change => TextDocumentSyncKind.Full;
-       
+        public static TextDocumentSyncKind Change => TextDocumentSyncKind.Full;
+
 
         public override TextDocumentAttributes GetTextDocumentAttributes(DocumentUri uri)
         {
@@ -70,11 +72,45 @@ namespace WorldBoxModdingToolChain.Handlers
 
         public override Task<MediatR.Unit> Handle(DidSaveTextDocumentParams request, CancellationToken cancellationToken)
         {
-            
+
             var documentUri = (Uri)request.TextDocument.Uri;
             FileLogger.Log($"Document saved: {request.TextDocument.Uri}");
-            var documentText = string.Join("\n", _documentContents[documentUri]);
-            AnalyzeAndStoreVariables(documentUri, documentText);
+            //Changed from string.Join("\n", _documentContents[documentUri]);
+            var documentText = _documentContents[documentUri];
+
+            string updatedText = HandleGreaterSuggestionTypo(documentText.ToString());
+
+            if (updatedText != documentText.ToString())
+            {
+                try
+                {
+                    string originalPath = request.TextDocument.Uri.Path;
+
+                    // Remove any leading '/' or duplicate path prefixes
+                    string cleanPath = originalPath.TrimStart('/');
+
+                    // If the path already starts with a drive letter, use it directly
+                    // Otherwise, ensure it's a full path
+                    string filePath = Path.IsPathRooted(cleanPath)
+                        ? cleanPath
+                        : Path.GetFullPath(cleanPath);
+                    string fileContent = File.ReadAllText(filePath);
+                    File.WriteAllText(filePath, updatedText);
+                    //_documentContents[documentUri] = SourceText.From(updatedText);
+                    FileLogger.Log($"Performed Mods on: {filePath}");
+                }
+                catch (Exception ex)
+                {
+                    FileLogger.Log(ex.Message);
+                }
+                
+            }
+            //documentText = _documentContents[documentUri]; //Not sure if this is really necesarry but
+
+
+
+
+            AnalyzeAndStoreVariables(documentUri, documentText.ToString());
             return MediatR.Unit.Task;
         }
 
@@ -121,6 +157,28 @@ namespace WorldBoxModdingToolChain.Handlers
 
         }
 
+        private string HandleGreaterSuggestionTypo(string text)
+        {
+
+            int location = text.IndexOf('$');
+            while (location != -1)
+            {
+                if (location + 1 >= text.Length || !text[location + 1].Equals('"'))
+                {
+                    text = text.Remove(location, 1);
+                }
+                else
+                {
+                    location++;
+                }
+
+                location = text.IndexOf('$');
+            }
+            return text;
+
+        }
+
+        
 
         protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(TextSynchronizationCapability capability, ClientCapabilities clientCapabilities)
         {

@@ -12,9 +12,9 @@ namespace WorldBoxModdingToolChain.Analysis
     public class VariableAnalyzer
     {
        
-        public static List<string> VariableNames(string code) => AnalyzeVariables(code).Values.ToList();
+        public static List<string> VariableNames(string code) => [.. AnalyzeVariables(code).Values];
 
-        public static List<string> TypeNames(string code) => AnalyzeVariables(code).Keys.ToList();
+        public static List<string> TypeNames(string code) => [.. AnalyzeVariables(code).Keys];
 
         public static Dictionary<string, string> GetVariableDictionary(string code) => AnalyzeVariables(code);
 

@@ -11,7 +11,7 @@ namespace WorldBoxModdingToolChain.Analysis
 {
     public class GreaterSuggestions
     {
-        public Dictionary<string, Func<string?, string>> GreaterSuggestionsDict = new Dictionary<string, Func<string?, string>>
+        public Dictionary<string, Func<string?, string>> GreaterSuggestionsDict = new()
         {
             { 
                 "$Traits",
@@ -31,7 +31,7 @@ namespace WorldBoxModdingToolChain.Analysis
             },
             {
                 "$NewTrait",
-                (param) => GetNewTraitCode(param)
+                (param) => GetNewTraitCode(param ?? string.Empty)
 
             },
         };

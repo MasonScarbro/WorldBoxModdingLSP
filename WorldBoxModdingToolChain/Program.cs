@@ -32,6 +32,8 @@ namespace WorldBoxModdingToolChain
                         .WithHandler<TextDocumentHandler>()
                         .WithHandler<CompletionHandler>()
                         .WithHandler<DefinitionHandler>()
+
+
                         .WithServices(services =>
                         {
                             services.AddSingleton(new GreaterSuggestions());
@@ -39,6 +41,7 @@ namespace WorldBoxModdingToolChain
                             services.AddSingleton(new ClassDecompiler("C:\\Program Files (x86)\\Steam\\steamapps\\common\\worldbox\\worldbox_Data\\Managed\\Assembly-CSharp.dll"));
                             services.AddSingleton<IDictionary<Uri, SourceText>>(new Dictionary<Uri, SourceText>());
                             services.AddSingleton(new AnalysisStorage());
+
                         })
                         .OnInitialize((server, request, token) =>
                         {
