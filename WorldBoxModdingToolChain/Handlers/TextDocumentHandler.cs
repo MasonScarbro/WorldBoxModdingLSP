@@ -22,12 +22,15 @@ namespace WorldBoxModdingToolChain.Handlers
     {
         private readonly IDictionary<Uri, SourceText> _documentContents;
         private readonly AnalysisStorage _analysisStorage;
-        
-        public TextDocumentHandler(IDictionary<Uri, SourceText> documentContents, AnalysisStorage analysisStorage)
+        private readonly PathLibrary _pathLibrary;
+
+        public TextDocumentHandler(IDictionary<Uri, SourceText> documentContents, AnalysisStorage analysisStorage, PathLibrary pathLibrary)
         {
             _documentContents = documentContents;
             _analysisStorage = analysisStorage;
-            
+            _pathLibrary = pathLibrary;
+
+
         }
 
         private readonly TextDocumentSelector _textDocumentSelector = new TextDocumentSelector(
@@ -121,7 +124,7 @@ namespace WorldBoxModdingToolChain.Handlers
             var filePath = DocumentUri.GetFileSystemPath(request.TextDocument.Uri);
 
             // TODO: get the folder path dynamically on startup
-            var decompiledFolderPath = @"C:\Users\Admin\source\repos\WorldBoxModdingLSP\WorldBoxModdingToolChain\Decompiled\";
+            var decompiledFolderPath = _pathLibrary.decompiledPath;
 
             if (filePath.StartsWith(decompiledFolderPath, StringComparison.OrdinalIgnoreCase))
             {

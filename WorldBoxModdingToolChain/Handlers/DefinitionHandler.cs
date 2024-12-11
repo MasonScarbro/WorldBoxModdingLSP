@@ -22,10 +22,12 @@ namespace WorldBoxModdingToolChain.Handlers
 
         private readonly ClassDecompiler _classDecompiler;
         private readonly IDictionary<Uri, SourceText> _documentContents;
-        public DefinitionHandler(ClassDecompiler classDecompiler, IDictionary<Uri, SourceText> documentContents) 
+        private readonly PathLibrary _pathLibrary;
+        public DefinitionHandler(ClassDecompiler classDecompiler, IDictionary<Uri, SourceText> documentContents, PathLibrary pathLibrary) 
         { 
             _classDecompiler = classDecompiler;
             _documentContents = documentContents;
+            _pathLibrary = pathLibrary;
         }
         public async Task<LocationOrLocationLinks> Handle(DefinitionParams request, CancellationToken cancellationToken)
         {
@@ -136,9 +138,9 @@ namespace WorldBoxModdingToolChain.Handlers
             if (code != null)
             {
                 // TODO: get the folder path dynamically on startup
-                var decompiledFilePath = $"C:\\Users\\Admin\\source\\repos\\WorldBoxModdingLSP\\WorldBoxModdingToolChain\\Decompiled\\{word}.cs";
+                var decompiledFilePath = $"{_pathLibrary.decompiledPath}/{word}.cs";
                 File.WriteAllText(decompiledFilePath, code);
-
+                FileLogger.Log(_pathLibrary.decompiledPath + "Decompiled Folder path");
                 var decompiledUri = DocumentUri.FromFileSystemPath(decompiledFilePath);
                 return new LocationOrLocationLinks(
                         new OmniSharp.Extensions.LanguageServer.Protocol.Models.Location
