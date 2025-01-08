@@ -137,7 +137,7 @@ namespace WorldBoxModdingToolChain.Handlers
         {
             if (code != null)
             {
-                // TODO: get the folder path dynamically on startup
+                
                 var decompiledFilePath = $"{_pathLibrary.decompiledPath}/{word}.cs";
                 File.WriteAllText(decompiledFilePath, code);
                 FileLogger.Log(_pathLibrary.decompiledPath + "Decompiled Folder path");

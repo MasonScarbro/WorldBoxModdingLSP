@@ -269,13 +269,37 @@ namespace WorldBoxModdingToolChain.Handlers
             while (memberAccess != null)
             {
                 // Add the right side of the member access (e.g., "foo" or "bar")
+                
                 memberNames.Insert(0, memberAccess.Name.Identifier.Text);
-
+                FileLogger.Log(" INSIDE MEMBER ACCESS TEXT = " + memberAccess.GetText().ToString());
                 // Move to the left side of the member access (could be another MemberAccessExpression or Identifier)
                 if (memberAccess.Expression is MemberAccessExpressionSyntax nestedAccess)
                 {
                     FileLogger.Log("Is Nested Access");
+                    
                     memberAccess = nestedAccess;
+                    
+
+                }
+                else if (memberAccess.Expression is InvocationExpressionSyntax invocation)
+                {
+                    // Handle function call
+                    if (invocation.Expression is MemberAccessExpressionSyntax nestedInvocationAccess)
+                    {
+                        FileLogger.Log("Is Nested Invocation Access");
+                        memberAccess = nestedInvocationAccess;
+                    }
+                    else if (invocation.Expression is IdentifierNameSyntax identifier)
+                    {
+                        // Reached the root of the chain (e.g., "b")
+                        FileLogger.Log("Found Root: " + identifier.Identifier.Text);
+                        memberNames.Insert(0, identifier.Identifier.Text);
+                        break;
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
                 else if (memberAccess.Expression is IdentifierNameSyntax identifier)
                 {

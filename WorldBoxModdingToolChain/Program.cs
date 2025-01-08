@@ -91,6 +91,7 @@ namespace WorldBoxModdingToolChain
             }
 
             FileLogger.Log($"LSP server ended");
+            FileLogger.Close();
         }
 
         public static string FindCompiledFolder(string extensionName)

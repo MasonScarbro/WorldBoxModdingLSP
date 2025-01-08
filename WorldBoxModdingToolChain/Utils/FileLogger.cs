@@ -14,12 +14,17 @@ namespace WorldBoxModdingToolChain.Utils
         public static void Initialize(string logFilePath, string prefix = "[INFO]")
         {
             _logPrefix = prefix;
-
+            Refresh(logFilePath);
             // Open the file stream for logging
             _logWriter = new StreamWriter(logFilePath, append: true)
             {
                 AutoFlush = true
             };
+        }
+
+        private static void Refresh(string logFilePath)
+        {
+            File.WriteAllText(logFilePath, string.Empty);
         }
 
         public static void Log(string message)
