@@ -59,7 +59,7 @@ namespace WorldBoxModdingToolChain.Handlers
 
             var line = lines[pos.Line];
             var charIndex = pos.Character;
-
+            FileLogger.Log("Line: " + line);
             if (charIndex > line.Length)
             {
                 FileLogger.Log($"Character position is out of bounds. Adjusting to the end of the line.");
@@ -103,7 +103,7 @@ namespace WorldBoxModdingToolChain.Handlers
                 if (accessors.Length == 2)
                 {
                     var classWord = accessors[0];
-                    
+                    FileLogger.Log($"Class Word: {classWord}");
                     _classDecompiler.DecompileByClass(classWord);
                     
                     var classCode = _classDecompiler.GetDecompiledCode(classWord);
@@ -113,7 +113,7 @@ namespace WorldBoxModdingToolChain.Handlers
                         if (startIdx != -1)
                         {
                             FileLogger.Log($"Found '{accessors[1]}' at Start: {new Position(0, startIdx).Character}, End: {startIdx + accessors[1].Length}");
-                            return GetAppropiateLocation(classCode, classWord, startIdx, (startIdx + accessors[1].Length));
+                            return GetAppropiateLocation(classCode, classWord, new Position(0, startIdx).Character, (startIdx + accessors[1].Length));
                         }
 
                     }
@@ -159,8 +159,8 @@ namespace WorldBoxModdingToolChain.Handlers
 
         private static bool IsBoundaryChar(char c)
         {
-            //Excluding periods
-            return (char.IsPunctuation(c) && c != '.') || char.IsSymbol(c);
+            // Excluding periods and underscores
+            return (char.IsPunctuation(c) && c != '.' && c != '_') || char.IsSymbol(c);
         }
         public DefinitionRegistrationOptions GetRegistrationOptions(DefinitionCapability capability, ClientCapabilities clientCapabilities)
         {

@@ -44,7 +44,7 @@ namespace WorldBoxModdingToolChain.Analysis
             var declarators = root.DescendantNodes().OfType<VariableDeclarationSyntax>();
             var nodes = root.DescendantNodes();
 
-            foreach ( var declarator in declarators)
+            foreach (var declarator in declarators)
             {
                 foreach (var variable in declarator.Variables)
                 {
@@ -52,7 +52,22 @@ namespace WorldBoxModdingToolChain.Analysis
 
                     if (symbol != null)
                     {
-                        variableTypes[symbol.Name] = symbol.Type.ToString();
+                        if (symbol.Name.Equals("var"))
+                        {
+                            FileLogger.Log($"Was Var");
+                            if (variable.Initializer?.Value is ObjectCreationExpressionSyntax objectCreation)
+                            {
+                                var type = model.GetTypeInfo(objectCreation).Type;
+                                variableTypes[symbol.Name] = type.ToString();
+                            }
+
+                        }
+                        else
+                        {
+                            variableTypes[symbol.Name] = symbol.Type.ToString();
+                        }
+                        
+
                         FileLogger.Log($"Variable: {symbol.Name}, Type: {symbol.Type}");
                     }
                 }
