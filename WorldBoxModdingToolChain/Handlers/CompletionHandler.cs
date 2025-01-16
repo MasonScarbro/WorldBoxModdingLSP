@@ -139,7 +139,9 @@ namespace WorldBoxModdingToolChain.Handlers
                             )
                         );
                     }
+
                 }
+
                 else
                 {
                     FileLogger.Log("No ObjectCreationExpressionSyntax found at cursor position.");

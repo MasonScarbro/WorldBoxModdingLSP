@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using WorldBoxModdingToolChain.Analysis;
 using Microsoft.CodeAnalysis.Text;
+using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 
 namespace WorldBoxModdingToolChain
 {
@@ -16,24 +17,26 @@ namespace WorldBoxModdingToolChain
        
         public static async Task Main(string[] args)
         {
-
+            
             //TODO: The asm and the decompiled folder path need to be gathered dynamically!
             FileLogger.Initialize("C:\\Users\\Admin\\source\\repos\\WorldBoxModdingLSP\\WorldBoxModdingToolChain\\Logs\\debug.txt", "[Program]"); // For debugging
             FileLogger.Log("Starting LSP server...");
 
             string compiledFolderPath = FindCompiledFolder("worldbox");
-
+            
 
             try
             {
+                
                 var server = await LanguageServer.From(options =>
                     options
                         .WithInput(Console.OpenStandardInput())
                         .WithOutput(Console.OpenStandardOutput())
                         .WithHandler<TextDocumentHandler>()
                         .WithHandler<CompletionHandler>()
+                        //.WithHandler<DiagnosticHandler>()
                         .WithHandler<DefinitionHandler>()
-
+                        
 
                         .WithServices(services =>
                         {
@@ -43,6 +46,8 @@ namespace WorldBoxModdingToolChain
                             services.AddSingleton<IDictionary<Uri, SourceText>>(new Dictionary<Uri, SourceText>());
                             services.AddSingleton(new AnalysisStorage());
                             services.AddSingleton(new PathLibrary(compiledFolderPath));
+                            
+                            
 
                         })
                         .OnInitialize((server, request, token) =>
@@ -118,10 +123,10 @@ namespace WorldBoxModdingToolChain
                 }
             }
             //else
-            if (Directory.Exists(@"C:\Users\Admin\.vscode\extensions\masonscarbro.worldbox-0.0.1\server\compiled"))
+            if (Directory.Exists(@$"C:\Users\{Environment.UserName}\.vscode\extensions\masonscarbro.worldbox-0.0.1\server\compiled"))
             {
                 FileLogger.Log($"{extensionName} Not Found but It was found as C:\\Users\\Admin\\.vscode\\extensions");
-                return @"C:\Users\Admin\.vscode\extensions\masonscarbro.worldbox-0.0.1\server\compiled";
+                return @$"C:\Users\{Environment.UserName}\.vscode\extensions\masonscarbro.worldbox-0.0.1\server\compiled";
             }
             FileLogger.Log($"{extensionName} Not Found using default");
             return $"C:\\Users\\Admin\\source\\repos\\WorldBoxModdingLSP\\WorldBoxModdingToolChain\\Decompiled";

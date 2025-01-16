@@ -1,4 +1,6 @@
 ﻿using MediatR;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client;
@@ -9,8 +11,10 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Reactive;
+using System.Reflection.Metadata;
 using System.Text;
 using System.Threading.Tasks;
 using WorldBoxModdingToolChain.Analysis;
@@ -23,13 +27,16 @@ namespace WorldBoxModdingToolChain.Handlers
         private readonly IDictionary<Uri, SourceText> _documentContents;
         private readonly AnalysisStorage _analysisStorage;
         private readonly PathLibrary _pathLibrary;
+        private readonly ILanguageServerFacade _facade;
+        private readonly GameCodeMetaDataRender _metaDataRender;
 
-        public TextDocumentHandler(IDictionary<Uri, SourceText> documentContents, AnalysisStorage analysisStorage, PathLibrary pathLibrary)
+        public TextDocumentHandler(IDictionary<Uri, SourceText> documentContents, AnalysisStorage analysisStorage, PathLibrary pathLibrary, ILanguageServerFacade facade, GameCodeMetaDataRender metaDataRender)
         {
             _documentContents = documentContents;
             _analysisStorage = analysisStorage;
             _pathLibrary = pathLibrary;
-
+            _facade = facade;
+            _metaDataRender = metaDataRender;
 
         }
 
@@ -64,12 +71,14 @@ namespace WorldBoxModdingToolChain.Handlers
             var documentUri = (Uri)request.TextDocument.Uri;
             FileLogger.Log($"Document changed: {request.TextDocument.Uri}");
 
+            
+
             foreach (var change in request.ContentChanges)
             {
                 var sourceText = SourceText.From(change.Text);
                 _documentContents[documentUri] = sourceText;
             }
-
+            HandleDiagnostics(request);
             return MediatR.Unit.Task;
         }
 
@@ -181,7 +190,57 @@ namespace WorldBoxModdingToolChain.Handlers
 
         }
 
-        
+        private void HandleDiagnostics(DidChangeTextDocumentParams request)
+        {
+            FileLogger.Log("is Dis even gettin called?");
+            var static_classes = _metaDataRender.GetStaticClasses();
+            var documentLines = _documentContents[(Uri)request.TextDocument.Uri];
+            var documentText = string.Join(Environment.NewLine, documentLines);
+            var diagnostics = ImmutableArray<Diagnostic>.Empty.ToBuilder();
+
+            // Parse syntax tree and get root
+            var syntaxTree = CSharpSyntaxTree.ParseText(documentText);
+            var root = syntaxTree.GetRoot();
+            var text = syntaxTree.GetText();
+
+            foreach (var line in text.Lines)
+            {
+
+                var node = root.FindNode(line.Span);
+
+
+                if (node.Parent is MemberAccessExpressionSyntax memberAccess)
+                {
+
+                    if (!static_classes.Contains(memberAccess.Expression.ToString()) && _metaDataRender.GetClasses().Contains(memberAccess.Expression.ToString()))
+                    {
+                        FileLogger.Log("Ahh cant doo dat");
+                        FileLogger.Log("LineStart: " + node.SyntaxTree.GetLineSpan(node.Span).EndLinePosition);
+                        FileLogger.Log("CharStart: " + memberAccess.Expression.Span.Start);
+                        diagnostics.Add(new Diagnostic()
+                        {
+                            Code = "ErrorCode_001",
+                            Severity = DiagnosticSeverity.Error,
+                            Message = $"{memberAccess.Expression} is NOT static you must create an instance",
+                            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(node.SyntaxTree.GetLineSpan(node.Span).StartLinePosition.Line, memberAccess.Expression.Span.Start, node.SyntaxTree.GetLineSpan(node.Span).EndLinePosition.Line, memberAccess.Expression.Span.End),
+                            Source = memberAccess.Expression.ToString(),
+                            Tags = new Container<DiagnosticTag>(new DiagnosticTag[] { DiagnosticTag.Unnecessary })
+                        });
+
+
+                    }
+
+                }
+            }
+
+
+            _facade.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams()
+            {
+                Diagnostics = new Container<Diagnostic>(diagnostics.ToArray()),
+                Uri = request.TextDocument.Uri,
+                Version = request.TextDocument.Version
+            });
+        }
 
         protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(TextSynchronizationCapability capability, ClientCapabilities clientCapabilities)
         {
