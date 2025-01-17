@@ -29,15 +29,21 @@ namespace WorldBoxModdingToolChain.Handlers
         private readonly PathLibrary _pathLibrary;
         private readonly ILanguageServerFacade _facade;
         private readonly GameCodeMetaDataRender _metaDataRender;
+        private readonly DocumentParserService _documentParserService;
 
-        public TextDocumentHandler(IDictionary<Uri, SourceText> documentContents, AnalysisStorage analysisStorage, PathLibrary pathLibrary, ILanguageServerFacade facade, GameCodeMetaDataRender metaDataRender)
+        public TextDocumentHandler(IDictionary<Uri, SourceText> documentContents,
+            AnalysisStorage analysisStorage,
+            PathLibrary pathLibrary,
+            ILanguageServerFacade facade,
+            GameCodeMetaDataRender metaDataRender,
+            DocumentParserService documentParserService)
         {
             _documentContents = documentContents;
             _analysisStorage = analysisStorage;
             _pathLibrary = pathLibrary;
             _facade = facade;
             _metaDataRender = metaDataRender;
-
+            _documentParserService = documentParserService;
         }
 
         private readonly TextDocumentSelector _textDocumentSelector = new TextDocumentSelector(
@@ -199,9 +205,9 @@ namespace WorldBoxModdingToolChain.Handlers
             var diagnostics = ImmutableArray<Diagnostic>.Empty.ToBuilder();
 
             // Parse syntax tree and get root
-            var syntaxTree = CSharpSyntaxTree.ParseText(documentText);
-            var root = syntaxTree.GetRoot();
-            var text = syntaxTree.GetText();
+            var syntaxTree = _documentParserService.GetOrParseSyntaxTree((Uri)request.TextDocument.Uri, documentText);
+            var root = _documentParserService.GetRootNode(syntaxTree);
+            var text = _documentParserService.GetText(syntaxTree);
 
             foreach (var line in text.Lines)
             {

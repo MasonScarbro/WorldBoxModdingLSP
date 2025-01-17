@@ -28,12 +28,18 @@ namespace WorldBoxModdingToolChain.Handlers
         private readonly IDictionary<Uri, SourceText> _documentContents;
         private readonly AnalysisStorage _analysisStorage;
         private readonly GreaterSuggestions _greaterSuggestions;
-        public CompletionHandler(GameCodeMetaDataRender metaDataRender, IDictionary<Uri, SourceText> documentContents, AnalysisStorage analysisStorage, GreaterSuggestions greaterSuggestions)
+        private readonly DocumentParserService _documentParserService;
+        public CompletionHandler(GameCodeMetaDataRender metaDataRender,
+            IDictionary<Uri, SourceText> documentContents,
+            AnalysisStorage analysisStorage,
+            GreaterSuggestions greaterSuggestions,
+            DocumentParserService documentParserService)
         {
             _metaDataRender = metaDataRender;
             _documentContents = documentContents;
             _analysisStorage = analysisStorage;
             _greaterSuggestions = greaterSuggestions;
+            _documentParserService = documentParserService;
         }
 
         public CompletionRegistrationOptions GetRegistrationOptions(CompletionCapability capability, ClientCapabilities clientCapabilities)
@@ -55,13 +61,11 @@ namespace WorldBoxModdingToolChain.Handlers
             FileLogger.Log("Docuemnt text: " + documentText); //testing
 
             // Parse syntax tree and get root
-            var syntaxTree = CSharpSyntaxTree.ParseText(documentText);
-            var root = syntaxTree.GetRoot();
-            var text = syntaxTree.GetText();
+            var syntaxTree = _documentParserService.GetOrParseSyntaxTree((Uri)request.TextDocument.Uri, documentText);
 
             // Compute position details
-            var absolutePosition = text.Lines.GetPosition(new Microsoft.CodeAnalysis.Text.LinePosition(request.Position.Line, request.Position.Character));
-            var tokenAtCursor = root.FindToken(absolutePosition);
+            var absolutePosition = _documentParserService.GetAbsolutePosition(syntaxTree, request.Position.Line, request.Position.Character);
+            var tokenAtCursor = _documentParserService.FindTokenAtPosition(syntaxTree, request.Position.Line, request.Position.Character);
             FileLogger.Log("Absolute Position: " + absolutePosition);
             FileLogger.Log("Token: " + tokenAtCursor);
 
