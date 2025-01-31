@@ -17,7 +17,7 @@ namespace WorldBoxModdingToolChain
        
         public static async Task Main(string[] args)
         {
-            
+
             //TODO: The asm and the decompiled folder path need to be gathered dynamically!
             FileLogger.Initialize("C:\\Users\\Admin\\source\\repos\\WorldBoxModdingLSP\\WorldBoxModdingToolChain\\Logs\\debug.txt", "[Program]"); // For debugging
             FileLogger.Log("Starting LSP server...");

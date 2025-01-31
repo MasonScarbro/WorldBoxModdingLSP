@@ -14,6 +14,7 @@ using Microsoft.CodeAnalysis;
 using WorldBoxModdingToolChain.Utils;
 using WorldBoxModdingToolChain.Analysis;
 using System.Collections;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace WorldBoxModdingToolChain.Handlers
 {
@@ -23,11 +24,13 @@ namespace WorldBoxModdingToolChain.Handlers
         private readonly ClassDecompiler _classDecompiler;
         private readonly IDictionary<Uri, SourceText> _documentContents;
         private readonly PathLibrary _pathLibrary;
-        public DefinitionHandler(ClassDecompiler classDecompiler, IDictionary<Uri, SourceText> documentContents, PathLibrary pathLibrary) 
+        private readonly DocumentParserService _documentParserService;
+        public DefinitionHandler(ClassDecompiler classDecompiler, IDictionary<Uri, SourceText> documentContents, PathLibrary pathLibrary, DocumentParserService documentParserService) 
         { 
             _classDecompiler = classDecompiler;
             _documentContents = documentContents;
             _pathLibrary = pathLibrary;
+            _documentParserService = documentParserService;
         }
         public async Task<LocationOrLocationLinks> Handle(DefinitionParams request, CancellationToken cancellationToken)
         {
@@ -95,6 +98,7 @@ namespace WorldBoxModdingToolChain.Handlers
 
         private LocationOrLocationLinks GetLocationFromWord(string word)
         {
+            
             //if its trying to access we need to do analyze it
             if (word.Contains('.'))
             {
@@ -107,16 +111,37 @@ namespace WorldBoxModdingToolChain.Handlers
                     _classDecompiler.DecompileByClass(classWord);
                     
                     var classCode = _classDecompiler.GetDecompiledCode(classWord);
-                    if (classCode.Contains(accessors[1]))
+                    var syntaxTree = _documentParserService.GetOrParseSyntaxTree(new Uri($"{_pathLibrary.decompiledPath}/{classWord}.cs"), classCode);
+                    var root = _documentParserService.GetRootNode(syntaxTree);
+                    var text = _documentParserService.GetText(syntaxTree);
+                    foreach (var line in text.Lines)
                     {
-                        var startIdx = classCode.IndexOf(accessors[1]);
-                        if (startIdx != -1)
+                        
+                        if (line.Text.ToString().Contains(accessors[1]))
                         {
-                            FileLogger.Log($"Found '{accessors[1]}' at Start: {new Position(0, startIdx).Character}, End: {startIdx + accessors[1].Length}");
-                            return GetAppropiateLocation(classCode, classWord, new Position(0, startIdx).Character, (startIdx + accessors[1].Length));
-                        }
 
+                            
+                            var node = root.DescendantNodes()
+                            .FirstOrDefault(n =>
+                                (n is VariableDeclaratorSyntax varDecl && varDecl.Identifier.Text == accessors[1]) ||
+                                (n is MethodDeclarationSyntax methodDecl && methodDecl.Identifier.Text == accessors[1])
+                            );
+                            if (node == null)
+                            {
+                                FileLogger.Log($"Could not find exact node for '{accessors[1]}'");
+                                continue;
+                            }
+                            var location = node.GetLocation().GetLineSpan();
+                            var range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                                location.StartLinePosition.Line, location.StartLinePosition.Character,
+                                location.EndLinePosition.Line, location.EndLinePosition.Character
+                            );
+                            //FileLogger.Log($"Found '{accessors[1]}' at Range: {range}");
+                            return GetAppropiateLocation(classCode, classWord, range);
+                        }
+                        
                     }
+                  
                     
                 }
                 //TODO: Trace Foward to find refernce in class
@@ -129,11 +154,11 @@ namespace WorldBoxModdingToolChain.Handlers
             _classDecompiler.DecompileByClass(word);
             var code = _classDecompiler.GetDecompiledCode(word);
             if (code == string.Empty) return new LocationOrLocationLinks();
-            return GetAppropiateLocation(code, word);
+            return GetAppropiateLocation(code, word, new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(0, 0, 0 ,0));
 
         }
 
-        private LocationOrLocationLinks GetAppropiateLocation(string code, string word, int start = 0, int end = 0)
+        private LocationOrLocationLinks GetAppropiateLocation(string code, string word, OmniSharp.Extensions.LanguageServer.Protocol.Models.Range range)
         {
             if (code != null)
             {
@@ -146,11 +171,7 @@ namespace WorldBoxModdingToolChain.Handlers
                         new OmniSharp.Extensions.LanguageServer.Protocol.Models.Location
                         {
                             Uri = decompiledUri,
-                            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range
-                            {
-                                Start = new Position(0, start),
-                                End = new Position(0, end)
-                            }
+                            Range = range,
                         }
                     );
             }
