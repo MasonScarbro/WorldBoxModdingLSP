@@ -14,15 +14,17 @@ namespace WorldBoxModdingToolChain.Analysis
         public string Name { get; set; }
         public TypeReference? ReturnType { get; set; }
 
+        public bool IsStatic { get; set; }
         public string? Parameters { get; set; }
         public CompletionItemKind Kind { get; set; }
 
         public MarkupContent Documentation { get; }
-        public GameClassMetaObject(string name, TypeReference returnType, CompletionItemKind kind, string parameters = null)
+        public GameClassMetaObject(string name, TypeReference returnType, CompletionItemKind kind, bool isStatic = false,string parameters = null)
         {
             Name= name;
             ReturnType= returnType;
             Kind= kind;
+            IsStatic= isStatic;
             Parameters = parameters;
             Documentation = new MarkupContent
             {

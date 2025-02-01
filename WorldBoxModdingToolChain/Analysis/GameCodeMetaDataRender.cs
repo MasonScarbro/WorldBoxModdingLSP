@@ -45,7 +45,8 @@ namespace WorldBoxModdingToolChain.Analysis
                         return new GameClassMetaObject(
                             f.Name,
                             f.FieldType,
-                            CompletionItemKind.Field
+                            CompletionItemKind.Field,
+                            isStatic: f.IsStatic
                         );
                     }).ToList();
 
@@ -68,7 +69,7 @@ namespace WorldBoxModdingToolChain.Analysis
                             m.Name,
                             m.ReturnType,
                             CompletionItemKind.Method,
-                            parameters
+                            parameters: parameters
                         );
                     }).ToList();
 

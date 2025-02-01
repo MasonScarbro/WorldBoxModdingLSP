@@ -19,6 +19,10 @@ using System.Text;
 using System.Threading.Tasks;
 using WorldBoxModdingToolChain.Analysis;
 using WorldBoxModdingToolChain.Utils;
+using static ICSharpCode.Decompiler.IL.Transforms.Stepper;
+using Microsoft.CodeAnalysis;
+using Diagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
+using DiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
 
 namespace WorldBoxModdingToolChain.Handlers
 {
@@ -208,7 +212,7 @@ namespace WorldBoxModdingToolChain.Handlers
             var syntaxTree = _documentParserService.GetOrParseSyntaxTree((Uri)request.TextDocument.Uri, documentText);
             var root = _documentParserService.GetRootNode(syntaxTree);
             var text = _documentParserService.GetText(syntaxTree);
-
+            
             foreach (var line in text.Lines)
             {
 
@@ -220,18 +224,36 @@ namespace WorldBoxModdingToolChain.Handlers
 
                     if (!static_classes.Contains(memberAccess.Expression.ToString()) && _metaDataRender.GetClasses().Contains(memberAccess.Expression.ToString()))
                     {
+                        var fields_and_properties = _metaDataRender.GetFieldsAndProperties();
+                        bool needsReport = true;
+                        List<string> fullExpr = [.. GetFullMemberAccess(memberAccess).Split('.')];
+
+                        if (fullExpr.Count > 1)
+                        {
+                            //TODO: Optimize this, also this just assumes that the chain is correct after one, Check Issue #8
+                            if (fields_and_properties.TryGetValue(memberAccess.Expression.ToString(), out var fieldList) &&
+                                fieldList.Any(field => field.Name == fullExpr[1] && field.IsStatic))
+                            {
+                                needsReport = false;
+                            }
+                        }
+                        
                         FileLogger.Log("Ahh cant doo dat");
                         FileLogger.Log("LineStart: " + node.SyntaxTree.GetLineSpan(node.Span).EndLinePosition);
                         FileLogger.Log("CharStart: " + memberAccess.Expression.Span.Start);
-                        diagnostics.Add(new Diagnostic()
+                        if (needsReport)
                         {
-                            Code = "ErrorCode_001",
-                            Severity = DiagnosticSeverity.Error,
-                            Message = $"{memberAccess.Expression} is NOT static you must create an instance",
-                            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(node.SyntaxTree.GetLineSpan(node.Span).StartLinePosition.Line, memberAccess.Expression.Span.Start, node.SyntaxTree.GetLineSpan(node.Span).EndLinePosition.Line, memberAccess.Expression.Span.End),
-                            Source = memberAccess.Expression.ToString(),
-                            Tags = new Container<DiagnosticTag>(new DiagnosticTag[] { DiagnosticTag.Unnecessary })
-                        });
+                            diagnostics.Add(new Diagnostic()
+                            {
+                                Code = "ErrorCode_001",
+                                Severity = DiagnosticSeverity.Error,
+                                Message = $"{memberAccess.Expression} is NOT static you must create an instance",
+                                Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(node.SyntaxTree.GetLineSpan(node.Span).StartLinePosition.Line, memberAccess.Expression.Span.Start, node.SyntaxTree.GetLineSpan(node.Span).EndLinePosition.Line, memberAccess.Expression.Span.End),
+                                Source = memberAccess.Expression.ToString(),
+                                Tags = new Container<DiagnosticTag>(new DiagnosticTag[] { DiagnosticTag.Unnecessary })
+                            });
+                        }
+                        
 
 
                     }
@@ -256,6 +278,25 @@ namespace WorldBoxModdingToolChain.Handlers
                 Change = TextDocumentSyncKind.Full,
                 Save = new SaveOptions { IncludeText = true }
             };
+        }
+
+        /// <TODO>
+        /// 1. Put this in a utils
+        /// 2. integrate this with anything else that gets list of full member acess
+        /// </TODO>
+        private string GetFullMemberAccess(SyntaxNode node)
+        {
+            if (node is MemberAccessExpressionSyntax memberAccess)
+            {
+                string parentExpression = GetFullMemberAccess(memberAccess.Expression);
+                return parentExpression + "." + memberAccess.Name;
+            }
+            else if (node is InvocationExpressionSyntax invocation && invocation.Expression is MemberAccessExpressionSyntax mAccess)
+            {
+                // Handle method calls like `traits.add()`
+                return GetFullMemberAccess(mAccess); // Append () to indicate method calls
+            }
+            return node.ToString();
         }
     }
 }
