@@ -118,7 +118,7 @@ namespace WorldBoxModdingToolChain.Handlers
                         : Path.GetFullPath(cleanPath);
                     string fileContent = File.ReadAllText(filePath);
                     File.WriteAllText(filePath, updatedText);
-                    //_documentContents[documentUri] = SourceText.From(updatedText);
+                    
                     FileLogger.Log($"Performed Mods on: {filePath}");
                 }
                 catch (Exception ex)
@@ -226,7 +226,7 @@ namespace WorldBoxModdingToolChain.Handlers
                     {
                         var fields_and_properties = _metaDataRender.GetFieldsAndProperties();
                         bool needsReport = true;
-                        List<string> fullExpr = [.. GetFullMemberAccess(memberAccess).Split('.')];
+                        List<string> fullExpr = [.. _documentParserService.GetFullMemberAccess(memberAccess).Split('.')];
 
                         if (fullExpr.Count > 1)
                         {
@@ -238,9 +238,9 @@ namespace WorldBoxModdingToolChain.Handlers
                             }
                         }
                         
-                        FileLogger.Log("Ahh cant doo dat");
-                        FileLogger.Log("LineStart: " + node.SyntaxTree.GetLineSpan(node.Span).EndLinePosition);
-                        FileLogger.Log("CharStart: " + memberAccess.Expression.Span.Start);
+                        
+                        FileLogger.Log("LineStart: " + node.SyntaxTree.GetLineSpan(node.Span).EndLinePosition + "\nCharStart: " + memberAccess.Expression.Span.Start);
+   
                         if (needsReport)
                         {
                             diagnostics.Add(new Diagnostic()
@@ -280,23 +280,6 @@ namespace WorldBoxModdingToolChain.Handlers
             };
         }
 
-        /// <TODO>
-        /// 1. Put this in a utils
-        /// 2. integrate this with anything else that gets list of full member acess
-        /// </TODO>
-        private string GetFullMemberAccess(SyntaxNode node)
-        {
-            if (node is MemberAccessExpressionSyntax memberAccess)
-            {
-                string parentExpression = GetFullMemberAccess(memberAccess.Expression);
-                return parentExpression + "." + memberAccess.Name;
-            }
-            else if (node is InvocationExpressionSyntax invocation && invocation.Expression is MemberAccessExpressionSyntax mAccess)
-            {
-                // Handle method calls like `traits.add()`
-                return GetFullMemberAccess(mAccess); // Append () to indicate method calls
-            }
-            return node.ToString();
-        }
+        
     }
 }

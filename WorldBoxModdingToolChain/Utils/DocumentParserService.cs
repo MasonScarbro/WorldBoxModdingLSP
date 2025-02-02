@@ -1,6 +1,7 @@
 ﻿using ICSharpCode.Decompiler.CSharp.Syntax;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using System;
@@ -52,6 +53,25 @@ namespace WorldBoxModdingToolChain.Utils
         public void InvalidateCache(Uri documentUri)
         {
             _syntaxTreeCache.TryRemove(documentUri, out _);
+        }
+
+
+        /// <TODO>
+        /// 2. integrate this with anything else that gets list of full member acess
+        /// </TODO>
+        public string GetFullMemberAccess(SyntaxNode node)
+        {
+            if (node is MemberAccessExpressionSyntax memberAccess)
+            {
+                string parentExpression = GetFullMemberAccess(memberAccess.Expression);
+                return parentExpression + "." + memberAccess.Name;
+            }
+            else if (node is InvocationExpressionSyntax invocation && invocation.Expression is MemberAccessExpressionSyntax mAccess)
+            {
+                // Handle method calls like `traits.add()`
+                return GetFullMemberAccess(mAccess); // Append () to indicate method calls
+            }
+            return node.ToString();
         }
     }
 }

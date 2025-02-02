@@ -109,7 +109,9 @@ namespace WorldBoxModdingToolChain.Handlers
                         {
                             // You can get the name of the object type
                             var objectName = objectType.ToString(); // This will give the full type name
+
                             FileLogger.Log($"Object type being created: {objectName}");
+
                             if (instanceClassesAndProperties.ContainsKey(objectName))
                             {
                                 FileLogger.Log($"Class '{objectName}' found, fetching members...");
@@ -212,16 +214,8 @@ namespace WorldBoxModdingToolChain.Handlers
                         FileLogger.Log("Argument inside brackets: " + argumentExpression.ToString());
 
                         // If the argument is a variable or member access, handle it
-                        if (argumentExpression is IdentifierNameSyntax argIdentifier)
-                        {
-                            FileLogger.Log($"Found argument identifier: {argIdentifier.Identifier.Text}");
-                            // Add completion suggestions if needed
-                        }
-                        else if (argumentExpression is LiteralExpressionSyntax literal)
-                        {
-                            FileLogger.Log($"Found literal inside brackets: {literal.Token.ValueText}");
-                        }
-                        else if (argumentExpression is MemberAccessExpressionSyntax memberAccessB)
+                        
+                        if (argumentExpression is MemberAccessExpressionSyntax memberAccessB)
                         {
                             FileLogger.Log($"Found member access in bracket argument: {memberAccessB}");
                             HandleMemberAcces(

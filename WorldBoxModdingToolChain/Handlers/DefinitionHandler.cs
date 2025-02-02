@@ -49,6 +49,7 @@ namespace WorldBoxModdingToolChain.Handlers
             }
 
             var src = _documentContents[(Uri)documentUri].ToString();
+
             FileLogger.Log("Retrieved document content from in-memory store.");
 
             #region GetClickedOnWord
@@ -57,11 +58,11 @@ namespace WorldBoxModdingToolChain.Handlers
             if (pos.Line >= lines.Length)
             {
                 FileLogger.Log("Line position is out of bounds.");
-                
             }
 
             var line = lines[pos.Line];
             var charIndex = pos.Character;
+
             FileLogger.Log("Line: " + line);
             if (charIndex > line.Length)
             {
@@ -107,13 +108,14 @@ namespace WorldBoxModdingToolChain.Handlers
                 if (accessors.Length == 2)
                 {
                     var classWord = accessors[0];
-                    FileLogger.Log($"Class Word: {classWord}");
+                    
                     _classDecompiler.DecompileByClass(classWord);
                     
                     var classCode = _classDecompiler.GetDecompiledCode(classWord);
                     var syntaxTree = _documentParserService.GetOrParseSyntaxTree(new Uri($"{_pathLibrary.decompiledPath}/{classWord}.cs"), classCode);
                     var root = _documentParserService.GetRootNode(syntaxTree);
                     var text = _documentParserService.GetText(syntaxTree);
+
                     foreach (var line in text.Lines)
                     {
                         
@@ -165,8 +167,11 @@ namespace WorldBoxModdingToolChain.Handlers
                 
                 var decompiledFilePath = $"{_pathLibrary.decompiledPath}/{word}.cs";
                 File.WriteAllText(decompiledFilePath, code);
+
                 FileLogger.Log(_pathLibrary.decompiledPath + "Decompiled Folder path");
+
                 var decompiledUri = DocumentUri.FromFileSystemPath(decompiledFilePath);
+
                 return new LocationOrLocationLinks(
                         new OmniSharp.Extensions.LanguageServer.Protocol.Models.Location
                         {

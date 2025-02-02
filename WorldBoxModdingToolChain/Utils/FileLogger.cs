@@ -29,8 +29,12 @@ namespace WorldBoxModdingToolChain.Utils
 
         public static void Log(string message)
         {
-            string logMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {_logPrefix} {message}";
-            _logWriter.WriteLine(logMessage);
+            if (_logWriter != null) 
+            {
+                string logMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {_logPrefix} {message}";
+                _logWriter.WriteLine(logMessage);
+            }
+            
 
 
             //Console.WriteLine(logMessage);
