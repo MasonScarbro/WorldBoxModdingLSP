@@ -27,7 +27,7 @@ namespace WorldBoxModdingToolChain
             
 
             string compiledFolderPath = FindCompiledFolder("worldbox");
-            
+            string asmPath = FindAssemblyPath();
 
             try
             {
@@ -45,8 +45,8 @@ namespace WorldBoxModdingToolChain
                         .WithServices(services =>
                         {
                             services.AddSingleton(new GreaterSuggestions());
-                            services.AddSingleton(new GameCodeMetaDataRender("C:\\Program Files (x86)\\Steam\\steamapps\\common\\worldbox\\worldbox_Data\\Managed\\Assembly-CSharp.dll"));
-                            services.AddSingleton(new ClassDecompiler("C:\\Program Files (x86)\\Steam\\steamapps\\common\\worldbox\\worldbox_Data\\Managed\\Assembly-CSharp.dll"));
+                            services.AddSingleton(new GameCodeMetaDataRender(asmPath));
+                            services.AddSingleton(new ClassDecompiler(asmPath));
                             services.AddSingleton<IDictionary<Uri, SourceText>>(new Dictionary<Uri, SourceText>());
                             services.AddSingleton(new AnalysisStorage());
                             services.AddSingleton(new DocumentParserService());
@@ -135,6 +135,117 @@ namespace WorldBoxModdingToolChain
             }
             FileLogger.Log($"{extensionName} Not Found using default");
             return $"C:\\Users\\Admin\\source\\repos\\WorldBoxModdingLSP\\WorldBoxModdingToolChain\\Decompiled";
+        }
+        /// <summary>
+        /// Attempts to locate Assembly-CSharp.dll by checking, in order:
+        ///   1. Steam's default 32-bit install path
+        ///   2. Steam's default 64-bit install path
+        ///   3. Every Steam library folder listed in libraryfolders.vdf
+        ///   4. A WORLDBOX_PATH environment variable (for CI / non-standard installs)
+        /// Logs each attempt and throws a clear exception if nothing is found.
+        /// </summary>
+        public static string FindAssemblyPath()
+        {
+            const string relativeAssembly = @"worldbox\worldbox_Data\Managed\Assembly-CSharp.dll";
+
+            // 1. Common Steam install roots
+            var steamRoots = new List<string>
+            {
+                @"C:\Program Files (x86)\Steam\steamapps\common",
+                @"C:\Program Files\Steam\steamapps\common",
+            };
+
+            // 2. Additional Steam library folders from libraryfolders.vdf
+            steamRoots.AddRange(GetSteamLibraryFolders());
+
+            foreach (string root in steamRoots)
+            {
+                string candidate = Path.Combine(root, relativeAssembly);
+                FileLogger.Log($"[FindAssemblyPath] Checking: {candidate}");
+                if (File.Exists(candidate))
+                {
+                    FileLogger.Log($"[FindAssemblyPath] Found at: {candidate}");
+                    return candidate;
+                }
+            }
+
+            // 3. Environment variable override (useful for custom installs or CI)
+            string envPath = Environment.GetEnvironmentVariable("WORLDBOX_PATH");
+            if (!string.IsNullOrEmpty(envPath))
+            {
+                string candidate = Path.Combine(envPath, "worldbox_Data", "Managed", "Assembly-CSharp.dll");
+                FileLogger.Log($"[FindAssemblyPath] Checking WORLDBOX_PATH env: {candidate}");
+                if (File.Exists(candidate))
+                {
+                    FileLogger.Log($"[FindAssemblyPath] Found via WORLDBOX_PATH: {candidate}");
+                    return candidate;
+                }
+            }
+
+            // Nothing found — fail loudly so the user knows exactly what to fix
+            string message =
+                "Could not locate Assembly-CSharp.dll for WorldBox.\n" +
+                "Checked standard Steam paths and all Steam library folders.\n" +
+                "Set the WORLDBOX_PATH environment variable to your WorldBox install directory and restart.";
+
+            FileLogger.Log($"[FindAssemblyPath] ERROR: {message}");
+            throw new FileNotFoundException(message);
+        }
+
+        /// <summary>
+        /// Reads Steam's libraryfolders.vdf to find any extra Steam library locations
+        /// the user has configured (e.g. games installed on a secondary drive).
+        /// Returns an empty list if the file cannot be found or parsed.
+        /// </summary>
+        private static List<string> GetSteamLibraryFolders()
+        {
+            var folders = new List<string>();
+
+            // libraryfolders.vdf lives in the default Steam install
+            var vdfCandidates = new[]
+            {
+                @"C:\Program Files (x86)\Steam\steamapps\libraryfolders.vdf",
+                @"C:\Program Files\Steam\steamapps\libraryfolders.vdf",
+            };
+
+            foreach (string vdfPath in vdfCandidates)
+            {
+                if (!File.Exists(vdfPath)) continue;
+
+                try
+                {
+                    foreach (string line in File.ReadAllLines(vdfPath))
+                    {
+                        // Lines look like:   "path"   "D:\\SteamLibrary"
+                        string trimmed = line.Trim();
+                        if (!trimmed.StartsWith("\"path\"", StringComparison.OrdinalIgnoreCase)) continue;
+
+                        // Extract the value between the second pair of quotes
+                        int first = trimmed.IndexOf('"', 6);         // skip past "path"
+                        int second = trimmed.IndexOf('"', first + 1);
+                        int third = trimmed.IndexOf('"', second + 1);
+                        if (first < 0 || second < 0 || third < 0) continue;
+
+                        string folderPath = trimmed.Substring(second + 1, third - second - 1)
+                                                    .Replace(@"\\", @"\");
+
+                        string steamappsCommon = Path.Combine(folderPath, "steamapps", "common");
+                        if (Directory.Exists(steamappsCommon))
+                        {
+                            folders.Add(steamappsCommon);
+                            FileLogger.Log($"[GetSteamLibraryFolders] Found library: {steamappsCommon}");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    FileLogger.Log($"[GetSteamLibraryFolders] Failed to parse {vdfPath}: {ex.Message}");
+                }
+
+                break; // Only need the first vdf that exists
+            }
+
+            return folders;
         }
 
         public static string FindLogsFolder(string extensionName)
